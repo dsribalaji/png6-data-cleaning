@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -29,6 +29,7 @@ from planner.core.errors import (
     request_validation_handler,
     unhandled_handler,
 )
+from planner.core.security import RequestPrincipal, get_current_principal
 from planner.modules.datasets.public import routers as datasets_routers
 from planner.modules.users.public import routers as users_routers
 
@@ -133,9 +134,7 @@ def create_app() -> FastAPI:
 
     for module_name in OPTIONAL_MODULES:
         try:
-            module = __import__(
-                f"planner.modules.{module_name}.public", fromlist=["routers"]
-            )
+            module = __import__(f"planner.modules.{module_name}.public", fromlist=["routers"])
         except ImportError:
             logger.warning("module %s routers not available yet", module_name)
             continue
@@ -143,7 +142,9 @@ def create_app() -> FastAPI:
             app.include_router(router)
 
     @app.get(f"{API_V1_PREFIX}/files/{{key:path}}", tags=["files"], response_model=None)
-    async def serve_file(key: str) -> Response:
+    async def serve_file(
+        key: str, _auth: RequestPrincipal = Depends(get_current_principal)
+    ) -> Response:
         """Serve a stored object by key in local demo mode (S3/MinIO uses presigned URLs)."""
         if settings.storage_backend != "local":
             return problem_response(

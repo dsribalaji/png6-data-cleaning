@@ -8,14 +8,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.db import get_session
+from planner.core.security import RequestPrincipal, require_roles
 from planner.modules.profiling.features.get_profile.schemas import ProfileResponse
 from planner.modules.profiling.features.get_profile.service import get_profile
-
-
-async def _any_user() -> None:
-    """Placeholder for require_roles(...) until the users module lands (W1)."""
-    return None
-
 
 router = APIRouter(prefix="/api/v1/datasets/{dataset_id}", tags=["profiling"])
 
@@ -24,7 +19,9 @@ router = APIRouter(prefix="/api/v1/datasets/{dataset_id}", tags=["profiling"])
 async def get_dataset_profile_endpoint(
     dataset_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _auth: None = Depends(_any_user),
+    _auth: RequestPrincipal = Depends(
+        require_roles("data_engineer", "administrator", "auditor", "viewer")
+    ),
 ) -> ProfileResponse:
     """Retrieve column-level and dataset-level profile metrics."""
     return await get_profile(session, dataset_id)

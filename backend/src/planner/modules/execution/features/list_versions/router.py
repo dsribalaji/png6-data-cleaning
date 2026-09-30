@@ -8,21 +8,20 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.db import get_session
+from planner.core.security import RequestPrincipal, require_roles
 from planner.modules.execution.features.list_versions.service import list_versions
 from planner.modules.execution.schemas import VersionsResponse
 
 router = APIRouter(prefix="/api/v1/plans", tags=["execution"])
 
 
-def _any_user() -> None:
-    """placeholder for require_roles(...) until the users module lands (W1)"""
-
-
 @router.get("/{plan_id}/versions", response_model=VersionsResponse)
 async def get_plan_versions(
     plan_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _auth: None = Depends(_any_user),
+    _auth: RequestPrincipal = Depends(
+        require_roles("data_engineer", "administrator", "auditor", "viewer")
+    ),
 ) -> VersionsResponse:
     """Get list of executed versions for a plan."""
     return await list_versions(session, plan_id)
