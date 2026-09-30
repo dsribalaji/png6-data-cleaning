@@ -1,0 +1,94 @@
+[
+  {
+    "file": "VendorInvoices_uncleaned.xlsx",
+    "bytes": 18229,
+    "rows": 22,
+    "columns": 14,
+    "steps": 5,
+    "est_loss": 0.006,
+    "loss_limit": 0.05,
+    "validation_passed": true,
+    "tests": "8/8",
+    "reconciliation": "10/10",
+    "xlsx_bytes": 17691,
+    "csv_bytes": 6898,
+    "seconds": {
+      "upload": 2.5,
+      "profile": 22.62,
+      "plan": 1.5,
+      "execute_validate": 3.35,
+      "export_xlsx": 0.99,
+      "export_csv": 0.46,
+      "total": 33.04
+    }
+  },
+  {
+    "file": "invoices_1000.csv",
+    "bytes": 600634,
+    "rows": 995,
+    "columns": 18,
+    "steps": 12,
+    "est_loss": 0.284,
+    "loss_limit": 0.05,
+    "validation_passed": true,
+    "tests": "14/14",
+    "reconciliation": "8/8",
+    "xlsx_bytes": 234676,
+    "csv_bytes": 114915,
+    "seconds": {
+      "upload": 2.24,
+      "profile": 31.23,
+      "plan": 2.75,
+      "execute_validate": 3.13,
+      "export_xlsx": 1.92,
+      "export_csv": 0.37,
+      "total": 51.02
+    }
+  },
+  {
+    "file": "invoices_10000.csv",
+    "bytes": 6210053,
+    "rows": 9936,
+    "columns": 18,
+    "steps": 13,
+    "est_loss": 0.285,
+    "loss_limit": 0.05,
+    "validation_passed": true,
+    "tests": "14/14",
+    "reconciliation": "8/8",
+    "xlsx_bytes": 2352329,
+    "csv_bytes": 1165843,
+    "seconds": {
+      "upload": 1.19,
+      "profile": 50.9,
+      "plan": 3.87,
+      "execute_validate": 10.64,
+      "export_xlsx": 28.42,
+      "export_csv": 0.83,
+      "total": 100.55
+    }
+  },
+  {
+    "file": "VendorInvoices_LARGE_messy.csv",
+    "bytes": 18724645,
+    "rows": 30090,
+    "columns": 18,
+    "steps": 13,
+    "est_loss": 0.287,
+    "loss_limit": 0.05,
+    "validation_passed": true,
+    "tests": "14/14",
+    "reconciliation": "8/8",
+    "xlsx_bytes": 7069705,
+    "csv_bytes": 3508244,
+    "seconds": {
+      "upload": 1.86,
+      "profile": 98.04,
+      "plan": 6.41,
+      "execute_validate": 19.94,
+      "export_xlsx": 63.77,
+      "export_csv": 1.81,
+      "total": 195.87
+    }
+  }
+]
