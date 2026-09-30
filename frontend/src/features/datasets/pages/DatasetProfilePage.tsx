@@ -57,8 +57,9 @@ const FAILED_FALLBACK = "The plan job did not report a reason.";
 const PLAN_GENERATED_EVENTS = ["PlanGenerated", "plan.generated"];
 const JOB_FAILED_EVENTS = ["JobFailed", "job.failed"];
 
-function isPlanGenerated(type: string): boolean {
-  return PLAN_GENERATED_EVENTS.includes(type);
+function isPlanGenerated(type: string, status = ""): boolean {
+  // The backend's job.status stream reports type "plan" with status "completed".
+  return PLAN_GENERATED_EVENTS.includes(type) || (type === "plan" && status === "completed");
 }
 
 /** A failed plan job arrives either as a dedicated event or as status "failed". */
@@ -117,7 +118,7 @@ export function DatasetProfilePage() {
     const type = lastEvent.type ?? "";
     const status = lastEvent.status ?? "";
 
-    if (isPlanGenerated(type)) {
+    if (isPlanGenerated(type, status)) {
       const planId = lastEvent.planId ?? planIdFromResponse.current;
       setIsAwaitingPlanEvent(false);
       if (planId) {
@@ -140,6 +141,11 @@ export function DatasetProfilePage() {
     try {
       const response = await planMutation.mutateAsync({ id: datasetId });
       planIdFromResponse.current = response.planId ?? null;
+      // Plan already generated (steps in the response): no need to wait for the event.
+      if (response.planId && (response as { stepCount?: number }).stepCount) {
+        setIsAwaitingPlanEvent(false);
+        navigate(`/plans/${response.planId}`);
+      }
     } catch (error) {
       setIsAwaitingPlanEvent(false);
       const message =

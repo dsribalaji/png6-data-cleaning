@@ -19,21 +19,7 @@ from planner.modules.execution.schemas import RollbackRequest
 @pytest.fixture
 async def test_session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    from sqlalchemy import Column, Table, Uuid
-
-    if (
-        "planning.plan_steps" not in Base.metadata.tables
-        and "plan_steps" not in Base.metadata.tables
-    ):
-        Table(
-            "plan_steps",
-            Base.metadata,
-            Column("id", Uuid, primary_key=True),
-            schema="planning",
-        )
-
-    for table in Base.metadata.tables.values():
-        table.schema = None
+    # SQLite schemas are mapped in core.db; conftest registers every model.
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -112,7 +98,7 @@ async def test_rollback_success(test_session: AsyncSession):
 
     req = RollbackRequest(to_version=0, reason="Reverting step 1 due to bad logic")
 
-    with patch("planner.worker.celery_app.send_task") as mock_send_task:
+    with patch("planner.worker.send_task_eager_aware") as mock_send_task:
         resp = await rollback_request(test_session, plan_id, req)
 
         assert resp.plan_id == plan_id

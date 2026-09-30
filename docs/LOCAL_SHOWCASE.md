@@ -1,233 +1,54 @@
 # Local Showcase Guide
 
-Complete guide to running the PNG6 Agentic Data Cleaning Planner on your laptop for demonstration.
+How to demo the PNG6 Agentic Data Cleaning Planner on a laptop, end to end, with the reference invoice file.
 
-## Prerequisites
+## 1. Start it
 
-- **Python 3.12+** — [python.org](https://www.python.org/downloads/)
-- **Node.js 24+** — [nodejs.org](https://nodejs.org/)
-- **Groq API key** — Free at [console.groq.com](https://console.groq.com) (sign up, create API key)
-- **Git**
+Either follow "Run it locally" or "Run it with Docker Compose" in the [README](../README.md). No LLM key is needed: Level 2 is deterministic.
 
-Verify:
-```bash
-python --version  # 3.12+
-node --version    # v24+
-npm --version     # 10+
-```
+- Frontend: http://localhost:5173
+- API docs: http://localhost:8000/api/docs · health: http://localhost:8000/api/v1/health/live
 
-## Setup (15 minutes)
+## 2. The file
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/dsribalaji/png6-data-cleaning.git
-cd png6-data-cleaning
-```
+`data/reference/VendorInvoices_uncleaned.xlsx` — what makes it messy:
 
-### 2. Backend Setup
+- 22 invoice rows, plus 12 blank padding rows and 5 empty unnamed columns (dropped at ingest)
+- 313 line items packed as JSON text in `line_items`, with amounts like `"$140.00"` and `"4,735.12"`
+- 7 supplier spellings for 5 real suppliers (e.g. "Hart Business Solutions, LLC" vs "Hart Business Solutions")
+- 2 completely empty columns (`customer_vat_number`, `shipping_addresses`)
+- `total_price` duplicates `subtotal_with_vat` on every row
 
-```bash
-cd backend
+## 3. Walkthrough (about 5 minutes)
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+1. **Sign in** as the Data Engineer: `engineer@example.com` / `Engineer123!`.
+   (The Administrator, `admin@example.com` / `Admin123456!`, manages model settings, users and the audit trail but does not run cleaning, per the PRD role table.)
+2. **Upload** — Datasets → Upload dataset → pick the file → Upload & profile. Status goes to **Profiled**: 22 rows × 14 columns.
+3. **Profile** — open the dataset: null %, types and flags per column (`all_null`, `nested_json`, …) and the inferred rules (supplier groups 7 → 5, `total_price = subtotal_with_vat`, `line_items` is one-to-many).
+4. **Generate plan** — 5 steps, each with its estimated loss:
+   1. drop `customer_vat_number` (all null — 0% loss)
+   2. drop `shipping_addresses` (all null — 0% loss)
+   3. replace values in `supplier_name` (2 cells change spelling — 0.6%)
+   4. expand `line_items` into the `LineItems` table (0% loss — every item moves to the child table)
+   5. drop `total_price` (identical to `subtotal_with_vat` — 0% loss)
 
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configure Environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your values:
-```ini
-# Database (SQLite for demo, no setup needed)
-DATABASE_URL=sqlite+aiosqlite:///./planner.db
-
-# Groq API (get free key from console.groq.com)
-GROQ_API_KEY=gsk_your_key_here
-GROQ_MODEL=openai/gpt-oss-120b
-
-# Demo mode: tasks run inline, no Redis needed
-CELERY_TASK_ALWAYS_EAGER=true
-
-# Local file storage
-STORAGE_BACKEND=local
-STORAGE_LOCAL_DIR=./storage
-```
-
-**Getting a Groq API key:**
-1. Go to [console.groq.com](https://console.groq.com)
-2. Sign up (free, no credit card)
-3. Go to "API Keys" → "Create API Key"
-4. Copy the key (starts with `gsk_`)
-5. Paste into `.env` as `GROQ_API_KEY`
-
-### 4. Initialize Database
-
-```bash
-# Run migrations
-alembic upgrade head
-
-# Create demo admin user
-python scripts/seed_demo.py
-```
-
-Demo credentials:
-- Email: `admin@example.com`
-- Password: `Admin123!`
-
-### 5. Start Backend (Terminal 1)
-
-```bash
-# Make sure .venv is activated
-uvicorn planner.main:app --host 127.0.0.1 --port 8000
-```
-
-Verify: open http://127.0.0.1:8000/api/v1/health/live — should return `{"status":"ok"}`
-
-API docs: http://127.0.0.1:8000/api/docs
-
-### 6. Frontend Setup (Terminal 2)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open http://localhost:5173 in your browser.
-
-## Showcase Walkthrough (10 minutes)
-
-### The Golden Workbook
-
-Use the reference file: `data/reference/VendorInvoices_uncleaned.xlsx`
-
-**What makes it messy:**
-- 22 invoice rows × 14 columns (with 12 blank trailing rows)
-- 313 nested line items buried in a JSON column
-- 7 supplier name variants (e.g., "Microsoft Corporation (India) Private Limited" vs "Microsoft Corporation")
-- 2 completely empty columns (customer_vat_number, shipping_addresses)
-- Mixed formats, inconsistent values
-
-**Expected results:**
-- 22 rows, 14 columns profiled
-- 17 inferred data quality rules
-- 5-step cleaning plan
-- 7 supplier variants → 5 canonical names
-- Golden total: 154,292 (must be preserved)
-
-### Step-by-Step Demo
-
-1. **Login**
-   - Open http://localhost:5173
-   - Login with `admin@example.com` / `Admin123!`
-
-2. **Upload**
-   - Click "Upload Dataset"
-   - Select `data/reference/VendorInvoices_uncleaned.xlsx`
-   - Wait for ingest to complete (status: `ready_for_plan`)
-
-3. **Profile** (automatic)
-   - The system profiles the data: 22 rows, 14 columns
-   - View column statistics, null counts, data types
-
-4. **Infer Rules** (automatic)
-   - 17 rules inferred, including:
-     - "supplier_name has 7 variants that should be 5"
-     - "customer_vat_number is 100% null"
-     - "line_items contains nested JSON"
-
-5. **Review Plan**
-   - Click "Generate Plan"
-   - 5 steps proposed:
-     1. Drop `customer_vat_number` (all null)
-     2. Drop `shipping_addresses` (all null)
-     3. Standardize `supplier_name` (7 → 5 variants)
-     4. Expand `line_items` (313 nested records)
-     5. Drop `total_price` (derived, can be recalculated)
-   - Each step shows estimated data loss
-
-6. **Approve**
-   - Review each step
-   - Accept, edit, or reject
-   - Click "Approve Plan"
-
-7. **Execute & Validate**
-   - Approved steps run deterministically
-   - Validation tests check results
-   - Export the cleaned workbook
-
-8. **Rollback** (if needed)
-   - Restore the original file byte-for-byte
-   - Verify SHA-256 hash matches
+   All are under the 5% threshold, so they start as Accept. Click a row for the rationale and a before/after sample; Edit or Reject any step.
+5. **Approve plan** → Confirm. Tests are generated, the plan runs, and the Run page shows every step Done.
+6. **Verify** — Tests: Unit 7/7, Integration 1/1. Reconciliation (recomputed from the source file):
+   - `row_count` 22 → 22 and `row_count:LineItems` 313 → 313
+   - `gross_total:subtotal_with_vat` 154,292.47 → 154,292.47
+   - every line-item amount column (amount, charges, tax, total) matches the JSON it came from
+7. **Export** — XLSX (sheets `main` 22 rows + `LineItems` 313 rows), CSV (zip, one file per table) or Pipeline (JSON list of the executed steps).
+8. **Roll back** — Version timeline → "Roll back here" on v0 → give a reason. A new version (v6) is created whose snapshot is byte-identical (SHA-256) to the original; export is blocked again because that state has not been validated.
+9. **Audit** — sign in as the Administrator → Audit trail: every stage above is logged with user and time.
 
 ## Troubleshooting
 
-### "GROQ_API_KEY not set"
-- Make sure `.env` exists in `backend/` directory
-- Verify the key starts with `gsk_`
-- Restart the backend after changing `.env`
+- **Port in use** — `lsof -ti:8000 | xargs kill` (macOS/Linux), or run Vite with `npm run dev -- --port 5174`.
+- **Frontend can't reach the API** — Vite proxies `/api` to `VITE_PROXY_TARGET` (default `http://localhost:8000`).
+- **"A dataset with this name already exists"** — dataset names are unique; change the name in the upload dialog.
+- **Old CPU / "Illegal instruction"** — reinstall the backend so `polars[rtcompat]` is used: `pip install -e ".[dev]"`.
 
-### "Database locked" (SQLite)
-- Only one process should write to SQLite at a time
-- If using eager mode, this is normal — tasks run inline
+## What the AI does (and doesn't)
 
-### "Port 8000 already in use"
-```bash
-# Find and kill the process
-lsof -ti:8000 | xargs kill -9  # macOS/Linux
-# Windows: netstat -ano | findstr :8000, then taskkill /PID <pid> /F
-```
-
-### "Port 5173 already in use"
-- Vite will ask to use a different port — say yes
-- Or: `npm run dev -- --port 5174`
-
-### Frontend can't reach backend
-- Verify backend is running on port 8000
-- Check `frontend/.env` or `vite.config.ts` for API URL
-- Default: `http://127.0.0.1:8000`
-
-## Production Mode (Docker)
-
-For a production-like setup with PostgreSQL, Redis, and S3-compatible storage:
-
-```bash
-docker compose up --build
-```
-
-This starts:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- MinIO (port 9000, S3-compatible storage)
-- Backend API (port 8000)
-- Frontend (port 5173)
-- Celery workers
-
-Set in `.env`:
-```ini
-DATABASE_URL=postgresql+asyncpg://planner:planner@db:5432/planner
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_TASK_ALWAYS_EAGER=false
-STORAGE_BACKEND=s3
-```
-
-## What the AI Does (and Doesn't Do)
-
-**The AI (Groq) DOES:**
-- Suggest data quality rules ("these 7 names look like 5 entities")
-- Propose cleaning operations from a fixed catalogue
-- Help explain the plan in plain language
-
-**The AI DOES NOT:**
-- Generate or execute code (all transformations are pre-built, deterministic functions)
-- Make final decisions (human approves every step)
-- Touch the data directly (it only suggests, the engine executes)
-
-This is by design — the system is auditable and safe because the AI is an advisor, not an actor.
+Level 2 runs without an LLM. When a model is configured (Model settings, Level 3), it may suggest extra rules and steps — only from the fixed operation catalogue. It never generates or executes code, and a person approves every step.

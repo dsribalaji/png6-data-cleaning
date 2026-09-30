@@ -66,6 +66,7 @@ async def approve_plan(
     # Audit defensively
     try:
         await record_audit(
+            session=session,
             event_type="plan.approved",
             object_type="plan",
             object_id=str(plan.id),

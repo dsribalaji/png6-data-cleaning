@@ -10,6 +10,14 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from planner.core.audit import AuditRecord, bind_audit_sink
+from planner.core.db import SessionLocal
+from planner.modules.audit.features.export_audit_events.router import (
+    router as export_audit_events_router,
+)
+from planner.modules.audit.features.list_audit_events.router import (
+    router as list_audit_events_router,
+)
 from planner.modules.audit.models import AuditEvent
 
 
@@ -44,4 +52,24 @@ async def append_audit_event(
     return row
 
 
-__all__ = ["append_audit_event", "AuditEvent"]
+class _DbAuditSink:
+    """Persists audit records, in the caller's session when one is passed."""
+
+    async def write(self, record: AuditRecord, session: AsyncSession | None = None) -> None:
+        fields = record.model_dump(by_alias=False)
+        if session is not None:
+            # Call sites audit after their own commit or right before raising, so the
+            # event is committed here to make it durable either way (FR-051).
+            await append_audit_event(session, **fields)
+            await session.commit()
+            return
+        async with SessionLocal() as own:
+            await append_audit_event(own, **fields)
+            await own.commit()
+
+
+bind_audit_sink(_DbAuditSink())
+
+routers = [list_audit_events_router, export_audit_events_router]
+
+__all__ = ["append_audit_event", "AuditEvent", "routers"]

@@ -26,38 +26,19 @@ Defaults (PROPOSED until the team approves, contract §6, P3): 5% loss limit, 50
 
 ## How to run it
 
-```bash
-docker compose up
-```
+See `README.md`: local dev (SQLite, inline jobs, no Docker) or `make build && make up` (Docker Compose, `deploy/docker-compose.yml`). One Docker image (a packaged, runnable snapshot of the app and its dependencies) starts as API, worker, or scheduler.
 
-One Docker image (a packaged, runnable snapshot of the app and its dependencies) starts as API, worker, or scheduler.
+Verify before claiming done: `cd backend && pytest -q` (includes `tests/api/test_exit_gate.py`, the Level-2 exit gate over HTTP) and `cd frontend && npm test && npm run build`.
 
 ## Where code lives
 
-Per the canonical layout in `DESIGN_CONTRACT.md` §3 (Backend.md + Frontend_PRD.md
-are the build authority since 2026-09-30; the 9-slice brief is superseded —
-this section was updated to match; the contract wins on any conflict):
+The integrated build follows `backend/CLAUDE.md` (Backend.md) rather than the older `DESIGN_CONTRACT.md` §3 layout:
 
-- `backend/` — `CLAUDE.md` (copy of Backend.md), `src/planner/` (the Python
-  service: `main.py`, `worker.py`, `core/`, `modules/`, `engine/`, `llm/`),
-  `migrations/` (Alembic), `tests/` (unit, integration, api, fixtures).
-  Modules: users, datasets, profiling, planning, execution, validation,
-  model_config, audit, evaluation. Each module exposes only `public.py` to
-  other modules (import-linter); `llm/gateway.py` is the only file importing
-  litellm.
-- `frontend/` — `CLAUDE.md` (copy of Frontend_PRD.md), feature-sliced SPA
-  (`src/app`, `src/api`, `src/auth`, `src/features`, `src/shared`), `e2e/`
-  (Playwright).
-- `contracts/events/` — JSON schemas generated from `core/events.py`.
-- `deploy/docker-compose.yml` — postgres, redis, rabbitmq, minio, api, worker,
-  beat, frontend, prometheus, grafana.
-- `data/reference/` — the untouched reference dataset
-  (`VendorInvoices_uncleaned.xlsx`).
-- `docs/` — FRS, diagrams, ADRs.
-
-API conventions: base `/api/v1`, camelCase JSON, problem+json errors, OpenAPI at
-`/api/docs`, SSE at `GET /api/v1/datasets/{id}/events`. Do not invent
-alternative directories; the contract forbids it.
+- `backend/src/planner/` — `main.py` (FastAPI app), `worker.py` (Celery), `core/` (config, db, security, audit, events, storage ports), `engine/` (pure data logic: ingest, profile, infer, ops catalogue, loss, tests_gen incl. reconciliation, guards), `modules/<module>/` (models, `public.py` = the only cross-module import surface, `features/<use_case>/` router + service + schemas + tests), `llm/` (LiteLLM gateway, Level 3).
+- `backend/migrations/` (Alembic), `backend/scripts/seed_demo.py`, `backend/tests/` (+ slice tests next to their code under `src/`).
+- `frontend/src/` — `features/<feature>/` (api hooks, components, pages), `auth/`, `api/` (ky client, types, SSE), `shared/`; `frontend/scripts/live-walkthrough.mjs` (browser run against live servers).
+- `data/reference/` — the untouched reference dataset (`VendorInvoices_uncleaned.xlsx`).
+- `docs/` — `LOCAL_SHOWCASE.md`, `architecture/` (brief-mode handoff).
 
 ## Conventions
 

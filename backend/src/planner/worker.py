@@ -103,6 +103,11 @@ def register_all_tasks(app: Celery) -> None:
     # themselves via @celery_app.task on import, so importing them here makes
     # the full upload -> profile -> infer -> plan -> execute chain work in
     # both eager (demo) and worker (production) modes.
+    try:  # binds the audit sink so task-side record_audit() calls persist
+        importlib.import_module("planner.modules.audit.public")
+    except Exception as exc:  # noqa: BLE001 - worker must start regardless
+        logger.warning("could not bind audit sink: %s", exc)
+
     for _module in ("profiling", "planning", "execution", "validation", "evaluation"):
         try:
             importlib.import_module(f"planner.modules.{_module}.tasks")

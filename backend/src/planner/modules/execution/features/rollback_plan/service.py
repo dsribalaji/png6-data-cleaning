@@ -41,33 +41,8 @@ async def rollback_request(
     from_version = max(v.version_no for v in versions)
     job_id = uuid.uuid4()
 
-    from planner.worker import send_task_eager_aware
-
-    send_task_eager_aware(
-        "planner.rollback_plan",
-        args=[str(plan_id), str(job_id), req.to_version, reason],
-        queue="execute",
-    )
-
-    try:
-        from planner.core.audit import record_audit
-
-        await record_audit(
-            session,
-            user_id=actor_id,
-            user_role="engineer",
-            event_type="rollback.requested",
-            object_type="plan",
-            object_id=str(plan_id),
-            details={
-                "to_version": req.to_version,
-                "from_version": from_version,
-                "reason": reason,
-            },
-        )
-    except NotImplementedError:
-        pass
-
+    # Persist the request before dispatching: in eager mode the task runs inline
+    # and must find this row to mark it completed.
     rollback_row = RollbackRow(
         id=uuid.uuid4(),
         plan_id=plan_id,
@@ -79,6 +54,25 @@ async def rollback_request(
     )
     session.add(rollback_row)
     await session.commit()
+
+    from planner.core.audit import record_audit
+
+    await record_audit(
+        session,
+        user_id=actor_id,
+        event_type="rollback.requested",
+        object_type="plan",
+        object_id=str(plan_id),
+        details={"to_version": req.to_version, "from_version": from_version, "reason": reason},
+    )
+
+    from planner.worker import send_task_eager_aware
+
+    send_task_eager_aware(
+        "planner.rollback_plan",
+        args=[str(plan_id), str(job_id), req.to_version, reason],
+        queue="execute",
+    )
 
     return RollbackResponse(
         plan_id=plan_id,

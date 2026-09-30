@@ -51,3 +51,16 @@ __all__ = [
     "ensure_default_benchmark_set",
     "get_run",
 ]
+
+from planner.modules.evaluation.features.create_evaluation.router import (  # noqa: E402
+    router as create_evaluation_router,
+)
+from planner.modules.evaluation.features.get_evaluation.router import (  # noqa: E402
+    router as get_evaluation_router,
+)
+from planner.modules.evaluation.features.list_evaluations.router import (  # noqa: E402
+    router as list_evaluations_router,
+)
+
+routers = [list_evaluations_router, create_evaluation_router, get_evaluation_router]
+__all__.append("routers")

@@ -57,11 +57,8 @@ from planner.modules.audit.public import append_audit_event
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide an isolated in-memory SQLite database session for tests.
 
-    On SQLite, schema must be stripped (AuditEvent.__table__.schema = None)
-    before metadata.create_all because SQLite does not support PostgreSQL schemas.
+    SQLite has no schemas; core.db maps them away on every SQLite connection.
     """
-    AuditEvent.__table__.schema = None
-
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=StaticPool,

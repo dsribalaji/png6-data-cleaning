@@ -461,10 +461,11 @@ export const handlers = [
       return problem(401, "INVALID_CREDENTIALS", "Unauthorized", "Email or password is incorrect.");
     }
 
-    const email = typeof body.email === "string" && body.email ? body.email : mswUser.email;
+    // Mirrors the real API: token only; the profile comes from GET /auth/me.
     const response: AuthResponse = {
       accessToken: MSW_ACCESS_TOKEN,
-      user: { ...mswUser, email },
+      tokenType: "Bearer",
+      expiresIn: 900,
     };
     return HttpResponse.json(response);
   }),
@@ -546,7 +547,7 @@ export const handlers = [
     if (reason.trim().length < 10) {
       return problem(400, "REASON_REQUIRED", "Bad Request", "A rollback reason of at least 10 characters is required.");
     }
-    const toVersionNo = typeof body.version === "number" ? body.version : 1;
+    const toVersionNo = typeof body.toVersion === "number" ? body.toVersion : 1;
     const response: RollbackResult = {
       rollbackId: "rollback-1",
       planId: MSW_PLAN_ID,

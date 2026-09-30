@@ -56,12 +56,9 @@ def fernet_key(monkeypatch: pytest.MonkeyPatch) -> str:
 async def async_session() -> AsyncSession:
     """Create in-memory SQLite database session with stripped schema."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    # Strip schema for SQLite compatibility
-    orig_schema = ModelConfig.__table__.schema
-    ModelConfig.__table__.schema = None
-
+    # All tables: services also write audit rows (SQLite schemas mapped in core.db).
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=[ModelConfig.__table__])
+        await conn.run_sync(Base.metadata.create_all)
 
     session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with session_maker() as session:
@@ -70,7 +67,6 @@ async def async_session() -> AsyncSession:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
-    ModelConfig.__table__.schema = orig_schema
 
 
 # ---------------------------------------------------------------------------

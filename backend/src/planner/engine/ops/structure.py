@@ -52,16 +52,19 @@ class DropColumnOperation(Operation):
         )
 
     def estimate_loss(self, df: pl.DataFrame, params: dict[str, Any]) -> LossEstimate:
+        # Only non-null values are destroyed; dropping an all-null column loses nothing.
         total_cells = df.height * df.width
-        cells_affected = df.height
-        pct = (cells_affected / total_cells) if total_cells > 0 else 0.0
-
+        lost = df.height - df[params["column"]].null_count()
+        twin = params.get("redundant_with")
+        if twin in df.columns and df[params["column"]].equals(df[twin], null_equal=True):
+            lost = 0  # values stay recoverable from the identical twin column
+        pct = (lost / total_cells) if total_cells > 0 else 0.0
         return LossEstimate(
             op=self.name,
-            rows_affected=df.height,
-            columns_affected=1 if total_cells > 0 else 0,
-            cells_affected=cells_affected,
-            cells_affected_pct=pct,
+            rows_affected=lost,
+            columns_affected=1 if lost else 0,
+            cells_affected=df.height,
+            cells_affected_pct=(df.height / total_cells) if total_cells else 0.0,
             estimated_loss=pct,
         )
 

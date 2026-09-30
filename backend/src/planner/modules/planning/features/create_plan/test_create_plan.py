@@ -49,7 +49,7 @@ async def test_create_plan_success(test_session: AsyncSession):
     dataset_id = uuid.uuid4()
     req = CreatePlanRequest(loss_threshold=0.08)
 
-    with patch("planner.worker.celery_app.send_task") as mock_send_task:
+    with patch("planner.worker.send_task_eager_aware") as mock_send_task:
         plan_out = await create_plan(test_session, dataset_id, req)
         assert plan_out.dataset_id == dataset_id
         assert plan_out.status == "proposed"

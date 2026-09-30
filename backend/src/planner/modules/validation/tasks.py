@@ -11,11 +11,13 @@ from uuid import UUID
 import polars as pl
 from sqlalchemy import func, select
 
+from planner.core.audit import record_audit
 from planner.core.db import SessionLocal
 from planner.core.events import EventType, ValidationCompletedPayload
 from planner.core.outbox import add_event
 from planner.engine.profile.profiler import ColumnProfile, TableProfile
 from planner.engine.tests_gen.checks import run_checks
+from planner.engine.tests_gen.reconcile import reconcile
 from planner.engine.tests_gen.generator import TestCase, generate_checks
 from planner.modules.execution.public import list_side_tables, read_snapshot_frame
 from planner.modules.validation.models import ReconciliationRow, TestCaseRow, TestRunRow
@@ -213,157 +215,30 @@ async def _async_run_validation(
                     )
                 )
 
-        # Reconciliations for the golden dataset
-        reconciliations_to_add: list[ReconciliationRow] = []
+        # Reconciliation (FR-042): recomputed from the source frame, dataset-agnostic.
+        from planner.modules.planning.public import get_decided_steps
 
-        # 1. Gross total reconciliation
-        try:
-            after_amount = 0.0
-            found_after = False
-            for tname, tdf in side_tables.items():
-                for col in ["amount", "total", "charges"]:
-                    if col in tdf.columns:
-                        after_amount += float(
-                            tdf[col].drop_nulls().cast(pl.Float64, strict=False).sum()
-                        )
-                        found_after = True
-                        break
-
-            before_amount = 0.0
-            found_before = False
-            if "line_items" in before_df.columns:
-                for val in before_df["line_items"].drop_nulls():
-                    if isinstance(val, str):
-                        try:
-                            items = json.loads(val)
-                            if isinstance(items, list):
-                                for itm in items:
-                                    if isinstance(itm, dict):
-                                        for k in ["amount", "total", "charges"]:
-                                            if k in itm and itm[k] is not None:
-                                                before_amount += float(itm[k])
-                                                found_before = True
-                                                break
-                        except Exception:
-                            pass
-
-            if not found_before and found_after:
-                before_amount = after_amount
-                found_before = True
-            elif not found_before:
-                for col in ["total_price", "amount", "total"]:
-                    if col in before_df.columns:
-                        before_amount = float(
-                            before_df[col].drop_nulls().cast(pl.Float64, strict=False).sum()
-                        )
-                        found_before = True
-                        break
-                for col in ["total_price", "amount", "total"]:
-                    if col in after_df.columns:
-                        after_amount = float(
-                            after_df[col].drop_nulls().cast(pl.Float64, strict=False).sum()
-                        )
-                        found_after = True
-                        break
-
-            gross_ok = abs(before_amount - after_amount) < 0.01
-            reconciliations_to_add.append(
-                ReconciliationRow(
-                    id=uuid.uuid4(),
-                    plan_id=plan_uuid,
-                    version_no=version_no,
-                    check_name="gross_total",
-                    source_value=str(round(before_amount, 2)),
-                    output_value=str(round(after_amount, 2)),
-                    ok=gross_ok,
-                )
+        steps = await get_decided_steps(session, plan_uuid)
+        recs = reconcile(before_df, after_df, side_tables, steps)
+        session.add_all(
+            ReconciliationRow(
+                id=uuid.uuid4(),
+                plan_id=plan_uuid,
+                version_no=version_no,
+                check_name=r.check_name,
+                source_value=f"{r.source_value:.2f}" if r.source_value % 1 else f"{r.source_value:.0f}",
+                output_value=f"{r.output_value:.2f}" if r.output_value % 1 else f"{r.output_value:.0f}",
+                ok=r.ok,
             )
-        except Exception as exc:
-            reconciliations_to_add.append(
-                ReconciliationRow(
-                    id=uuid.uuid4(),
-                    plan_id=plan_uuid,
-                    version_no=version_no,
-                    check_name="gross_total",
-                    source_value="error",
-                    output_value=str(exc)[:200],
-                    ok=False,
-                )
-            )
+            for r in recs
+        )
 
-        # 2. Invoice row count reconciliation
-        try:
-            src_rows = before_df.height
-            out_rows = after_df.height
-            row_ok = src_rows == out_rows
-            reconciliations_to_add.append(
-                ReconciliationRow(
-                    id=uuid.uuid4(),
-                    plan_id=plan_uuid,
-                    version_no=version_no,
-                    check_name="invoice_row_count",
-                    source_value=str(src_rows),
-                    output_value=str(out_rows),
-                    ok=row_ok,
-                )
-            )
-        except Exception as exc:
-            reconciliations_to_add.append(
-                ReconciliationRow(
-                    id=uuid.uuid4(),
-                    plan_id=plan_uuid,
-                    version_no=version_no,
-                    check_name="invoice_row_count",
-                    source_value="error",
-                    output_value=str(exc)[:200],
-                    ok=False,
-                )
-            )
-
-        # 3. Line item count reconciliation
-        try:
-            after_items_count = sum(tdf.height for tdf in side_tables.values())
-            before_items_count = 0
-            if "line_items" in before_df.columns:
-                for val in before_df["line_items"].drop_nulls():
-                    if isinstance(val, str):
-                        try:
-                            items = json.loads(val)
-                            if isinstance(items, list):
-                                before_items_count += len(items)
-                        except Exception:
-                            pass
-            elif after_items_count > 0:
-                before_items_count = after_items_count
-
-            items_ok = before_items_count == after_items_count
-            reconciliations_to_add.append(
-                ReconciliationRow(
-                    id=uuid.uuid4(),
-                    plan_id=plan_uuid,
-                    version_no=version_no,
-                    check_name="line_item_count",
-                    source_value=str(before_items_count),
-                    output_value=str(after_items_count),
-                    ok=items_ok,
-                )
-            )
-        except Exception as exc:
-            reconciliations_to_add.append(
-                ReconciliationRow(
-                    id=uuid.uuid4(),
-                    plan_id=plan_uuid,
-                    version_no=version_no,
-                    check_name="line_item_count",
-                    source_value="error",
-                    output_value=str(exc)[:200],
-                    ok=False,
-                )
-            )
-
-        session.add_all(reconciliations_to_add)
-
-        passed = len(after_results) > 0 and all(r.passed for r in after_results)
+        # FR-043: export gate needs every test AND every reconciliation to pass.
+        passed = (
+            len(after_results) > 0
+            and all(r.passed for r in after_results)
+            and all(r.ok for r in recs)
+        )
 
         await add_event(
             session,
@@ -376,6 +251,14 @@ async def _async_run_validation(
         )
 
         await session.commit()
+        await record_audit(
+            session=session,
+            event_type="validation.completed",
+            object_type="plan",
+            object_id=plan_id,
+            details={"versionNo": version_no, "passed": passed, "tests": len(cases),
+                     "reconciliationsOk": sum(r.ok for r in recs), "reconciliations": len(recs)},
+        )
 
         try:
             from planner.core.realtime import publish_job_status
@@ -386,7 +269,7 @@ async def _async_run_validation(
         except Exception:
             pass
 
-        return {"passed": passed, "tests": len(cases)}
+        return {"passed": passed, "tests": len(cases), "reconciliations": len(recs)}
 
 
 @celery_app.task(

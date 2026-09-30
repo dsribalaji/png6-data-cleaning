@@ -2,6 +2,24 @@
 
 Newest first. Each entry: date, decider, decision, rationale, status (active / superseded / proposed).
 
+## 2026-09-30 — Level 2 exit gate met end to end (HTTP + browser); fixes to reach it (Claude, for SB)
+
+**Decision:** Close the gaps between the integrated build and the Level-2 exit gate, and prove it with a no-stub test: `backend/tests/api/test_exit_gate.py` (upload → validated export → rollback over HTTP on the reference file) plus a live browser walk-through (`frontend/scripts/live-walkthrough.mjs`).
+
+**Rationale / what changed:**
+- Reconciliation was tautological (it copied the output total into the source total when parsing failed) and the export gate ignored it. It is now recomputed from the source file (`engine/tests_gen/reconcile.py`): row counts, child row counts, per-column sums including line items re-parsed from JSON, and the gross total. The export gate needs every test AND every reconciliation to pass.
+- `dollar-text-in-json`: expanded line-item amounts (`"$140.00"`, `"4,735.12"`) are cast to numbers with float artifacts rounded to cents.
+- Exports carry every table (XLSX sheets / CSV zip) and a pipeline JSON (FR-037).
+- Loss estimates count only destroyed values: dropping an all-null column, a column identical to another, or expanding parseable JSON costs 0%. Steps at or under the threshold default to Accept (PRD S5, FR-031).
+- Audit events were silently dropped (no sink was ever bound); they are now persisted for every stage (FR-051).
+- Rollback verifies the restored snapshot is byte-identical (SHA-256) and saves the request before dispatching the job.
+- Model-config, audit-events and evaluations routers were never mounted; now mounted.
+- Frontend could not sign in (it read `user` from the login response), could not upload in Chrome over HTTP/1.1 (streamed upload body), misread profile/validation payloads and sent the wrong rollback field. All fixed; a reload now keeps the session.
+- Demo users: `engineer@example.com / Engineer123!` (Data Engineer, runs the flow) and `admin@example.com / Admin123456!` (the old 9-character password could not pass the 12-character login rule).
+- Tests: 185 backend (the suite had excluded `src/` slice tests and the stubbed golden test) and 81 frontend pass.
+
+**Status:** active.
+
 ## 2026-09-30 — Level 2 integration complete: E2E verified to plan approval, docs written, local commit (Ruby)
 
 **Decision:** Integrated the four worker outputs into a working system, verified the core flow end-to-end via live API (upload → ingest → profile → infer → plan → review → approve), wrote laptop showcase docs (README quick-start + docs/LOCAL_SHOWCASE.md), and made a local commit. No push.

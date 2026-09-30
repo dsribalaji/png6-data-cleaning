@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 from pathlib import Path
 import tempfile
@@ -13,6 +14,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
+from planner.core.audit import record_audit
 from planner.core.db import SessionLocal
 from planner.core.events import (
     EventType,
@@ -184,6 +186,13 @@ async def _async_execute_plan(plan_id: str, job_id: str) -> dict[str, Any]:
                 ),
             )
             await session.commit()
+            await record_audit(
+                session=session,
+                event_type="plan.executed",
+                object_type="plan",
+                object_id=plan_id,
+                details={"versionNo": final_version, "steps": len(steps)},
+            )
 
             try:
                 from planner.core.realtime import publish_job_status
@@ -271,6 +280,11 @@ async def _async_rollback_plan(
         data = await storage.get_object(target.snapshot_object_key)
         new_key = f"snapshots/{plan_id}/v{new_no}.parquet"
         await storage.put_object(new_key, data, "application/octet-stream")
+        # FR-034: prove the restored snapshot is byte-identical to the target version.
+        target_sha = hashlib.sha256(data).hexdigest()
+        restored_sha = hashlib.sha256(await storage.get_object(new_key)).hexdigest()
+        if restored_sha != target_sha:
+            raise RuntimeError("ROLLBACK_VERIFY_FAILED: restored snapshot differs from target")
 
         # Copy side tables with prefix v{to}__ -> v{new}__
         side_prefix = f"snapshots/{plan_id}/v{to_version_no}__"
@@ -295,6 +309,8 @@ async def _async_rollback_plan(
                 "from": from_no,
                 "to": to_version_no,
                 "reason": reason,
+                "sha256": restored_sha,
+                "byteIdentical": True,
             },
             executed_by=None,
         )
@@ -321,6 +337,14 @@ async def _async_rollback_plan(
             ),
         )
         await session.commit()
+        await record_audit(
+            session=session,
+            event_type="rollback.completed",
+            object_type="plan",
+            object_id=plan_id,
+            details={"fromVersion": from_no, "toVersion": to_version_no, "newVersion": new_no,
+                     "sha256": restored_sha, "byteIdentical": True},
+        )
 
         try:
             from planner.core.realtime import publish_job_status
@@ -336,6 +360,8 @@ async def _async_rollback_plan(
             "from_version": from_no,
             "to_version": to_version_no,
             "new_version": new_no,
+            "sha256": restored_sha,
+            "byte_identical": True,
         }
 
 

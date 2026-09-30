@@ -29,6 +29,7 @@ async def get_rules(session: AsyncSession, dataset_id: UUID) -> RulesResponse:
     # Record audit defensively
     try:
         await record_audit(
+            session=session,
             event_type="dataset.rules_viewed",
             object_type="dataset",
             object_id=str(dataset_id),

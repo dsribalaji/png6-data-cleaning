@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
-from sqlalchemy import MetaData
+from sqlalchemy import Connection, Engine, MetaData, event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -34,27 +34,25 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+# SQLite has no schemas: map every module schema to the default one. Applied to every
+# SQLite engine (app and test fixtures alike) on connect.
+SQLITE_SCHEMA_MAP: dict[str, None] = dict.fromkeys(
+    ("profiling", "planning", "datasets", "users", "execution", "validation",
+     "model_config", "audit", "evaluation")
+)
+
+
+@event.listens_for(Engine, "engine_connect")
+def _sqlite_schema_translate(conn: Connection) -> None:
+    if conn.dialect.name == "sqlite":
+        conn.execution_options(schema_translate_map=SQLITE_SCHEMA_MAP)
+
+
 def _create_engine() -> AsyncEngine:
-    if settings.database_url.startswith("sqlite"):
-        return create_async_engine(
-            settings.database_url,
-            echo=False,
-            poolclass=NullPool,
-            execution_options={
-                "schema_translate_map": {
-                    "profiling": None,
-                    "planning": None,
-                    "datasets": None,
-                    "users": None,
-                    "execution": None,
-                    "validation": None,
-                    "model_config": None,
-                    "audit": None,
-                    "evaluation": None,
-                }
-            },
-        )
-    return create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+    # Celery tasks each run in their own asyncio.run() loop; asyncpg connections are
+    # bound to the loop that opened them, so pooled connections break across tasks.
+    # ponytail: no pooling; add a per-loop engine or PgBouncer if connection setup cost shows up.
+    return create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
 
 
 engine: AsyncEngine = _create_engine()

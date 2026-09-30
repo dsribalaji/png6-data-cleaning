@@ -20,21 +20,7 @@ from planner.modules.validation.public import latest_validation_passed
 @pytest.fixture
 async def test_session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    from sqlalchemy import Column, Table, Uuid
-
-    if (
-        "planning.plan_steps" not in Base.metadata.tables
-        and "plan_steps" not in Base.metadata.tables
-    ):
-        Table(
-            "plan_steps",
-            Base.metadata,
-            Column("id", Uuid, primary_key=True),
-            schema="planning",
-        )
-
-    for table in Base.metadata.tables.values():
-        table.schema = None
+    # SQLite schemas are mapped in core.db; conftest registers every model.
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

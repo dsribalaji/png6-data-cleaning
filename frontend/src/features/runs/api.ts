@@ -131,6 +131,8 @@ interface RawTest {
   outcome?: unknown;
   result?: unknown;
   durationMs?: number | null;
+  /** GET /plans/{id}/validation nests each case's newest run here. */
+  latestRun?: { result?: unknown } | null;
 }
 
 interface RawValidation {
@@ -144,6 +146,8 @@ interface RawValidation {
   reconciliations?: unknown;
   latestPassed?: boolean | null;
   allPassed?: boolean | null;
+  /** Server-side export gate: every test and every reconciliation passed. */
+  passed?: boolean | null;
 }
 
 interface RawVersion {
@@ -208,7 +212,7 @@ function toTestRow(raw: RawTest, index: number, fallbackSuite: TestSuite): TestR
     name: raw.name ?? raw.testCaseName ?? UNTITLED_TEST,
     suite: toSuite(raw.suite ?? raw.type, fallbackSuite),
     targetStepNo: toNumber(raw.targetStepNo),
-    outcome: toOutcome(raw.outcome ?? raw.result),
+    outcome: toOutcome(raw.outcome ?? raw.result ?? raw.latestRun?.result),
     durationMs: toNumber(raw.durationMs),
   };
 }
@@ -340,6 +344,7 @@ export function toValidation(raw: unknown): Validation {
   );
 
   const latestPassed =
+    toBoolean(record.passed) ??
     toBoolean(record.latestPassed) ??
     toBoolean(record.allPassed) ??
     suitesAllPassed([unit, integration], reconciliation);
@@ -517,7 +522,7 @@ export function useRollback(): UseRollbackResult {
   return useMutation<RollbackResult, ApiError, RollbackVariables>({
     mutationFn: ({ planId, version, reason }) =>
       api
-        .post(`plans/${planId}/rollback`, { json: { version, reason } })
+        .post(`plans/${planId}/rollback`, { json: { toVersion: version, reason } })
         .json<RollbackResult>(),
     onSuccess: (_result, variables) => {
       invalidateAfterRollback(queryClient, variables);
@@ -527,7 +532,7 @@ export function useRollback(): UseRollbackResult {
 
 const EXPORT_EXTENSIONS: Record<ExportFormat, string> = {
   xlsx: "xlsx",
-  csv: "csv",
+  csv: "csv.zip", // one CSV per table, zipped
   pipeline: "json",
 };
 

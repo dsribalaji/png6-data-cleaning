@@ -105,9 +105,14 @@ async def upload_dataset_service(
     file: UploadFile,
     session: AsyncSession,
     principal: RequestPrincipal,
+    name: str | None = None,
 ) -> DatasetRead:
-    """Validate, stream, save raw dataset, record quarantine, and enqueue ingest."""
+    """Validate, stream, save raw dataset, record quarantine, and enqueue ingest.
+
+    ``name`` defaults to the file name (PRD S3).
+    """
     file_name = file.filename or ""
+    dataset_name = (name or "").strip() or file_name
     lower_name = file_name.lower()
 
     # 1. Enforce allowed extension (.xlsx or .csv)
@@ -115,7 +120,7 @@ async def upload_dataset_service(
         raise DatasetsErrors.UNSUPPORTED_FILE_TYPE
 
     # 2. Enforce dataset name uniqueness
-    stmt = select(Dataset).where(Dataset.name == file_name)
+    stmt = select(Dataset).where(Dataset.name == dataset_name)
     existing = (await session.execute(stmt)).scalar_one_or_none()
     if existing is not None:
         raise DatasetsErrors.DATASET_NAME_TAKEN
@@ -153,7 +158,7 @@ async def upload_dataset_service(
     # 6. Database transaction: Dataset + Quarantine + Ingest Job + Outbox
     dataset = Dataset(
         id=dataset_id,
-        name=file_name,
+        name=dataset_name,
         source="upload",
         file_name=file_name,
         status="profiling",
@@ -197,6 +202,7 @@ async def upload_dataset_service(
 
     # 8. Record audit event
     await record_audit(
+            session=session,
         user_id=principal.user_id,
         user_role=principal.role,
         event_type="dataset.upload",

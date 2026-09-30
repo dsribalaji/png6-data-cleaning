@@ -31,6 +31,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
 
     if user is None:
         await record_audit(
+            session=session,
             user_id=None,
             user_role=None,
             event_type="auth.login",
@@ -49,6 +50,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
             locked_until = locked_until.replace(tzinfo=timezone.utc)
         if locked_until > now:
             await record_audit(
+            session=session,
                 user_id=user.id,
                 user_role=role,
                 event_type="auth.login",
@@ -70,6 +72,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
             user.locked_until = now + timedelta(minutes=15)
             await session.commit()
             await record_audit(
+            session=session,
                 user_id=user.id,
                 user_role=role,
                 event_type="auth.login",
@@ -81,6 +84,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
 
         await session.commit()
         await record_audit(
+            session=session,
             user_id=user.id,
             user_role=role,
             event_type="auth.login",
@@ -97,6 +101,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
     # Check status
     if user.status != "active":
         await record_audit(
+            session=session,
             user_id=user.id,
             user_role=role,
             event_type="auth.login",
@@ -131,6 +136,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
     await session.commit()
 
     await record_audit(
+            session=session,
         user_id=user.id,
         user_role=role,
         event_type="auth.login",

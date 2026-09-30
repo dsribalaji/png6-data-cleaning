@@ -25,21 +25,7 @@ from planner.modules.execution.schemas import ExportRequest
 @pytest.fixture
 async def test_session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    from sqlalchemy import Column, Table, Uuid
-
-    if (
-        "planning.plan_steps" not in Base.metadata.tables
-        and "plan_steps" not in Base.metadata.tables
-    ):
-        Table(
-            "plan_steps",
-            Base.metadata,
-            Column("id", Uuid, primary_key=True),
-            schema="planning",
-        )
-
-    for table in Base.metadata.tables.values():
-        table.schema = None
+    # SQLite schemas are mapped in core.db; conftest registers every model.
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -134,7 +120,7 @@ async def test_create_export_csv_and_xlsx_success(
     # 1. Test CSV export
     req_csv = ExportRequest(format="csv")
     resp_csv = await create_export(test_session, plan_id, req_csv)
-    assert resp_csv.download_url.startswith("file://")
+    assert resp_csv.download_url.endswith(f"exports/{plan_id}/v1/tables.csv.zip")
     assert resp_csv.expires_at is not None
 
     # Check export row
@@ -149,7 +135,7 @@ async def test_create_export_csv_and_xlsx_success(
     # 2. Test XLSX export
     req_xlsx = ExportRequest(format="xlsx")
     resp_xlsx = await create_export(test_session, plan_id, req_xlsx)
-    assert resp_xlsx.download_url.startswith("file://")
+    assert resp_xlsx.download_url.endswith(f"exports/{plan_id}/v1/tables.xlsx")
 
     rows_xlsx = (
         await test_session.execute(
@@ -158,3 +144,12 @@ async def test_create_export_csv_and_xlsx_success(
     ).scalars().all()
     assert len(rows_xlsx) == 1
     assert rows_xlsx[0].version_no == 1
+
+    # CSV zip carries every table; the workbook has one sheet per table
+    import zipfile
+    import openpyxl
+
+    zf = zipfile.ZipFile(tmp_path / "exports" / str(plan_id) / "v1" / "tables.csv.zip")
+    assert sorted(zf.namelist()) == ["LineItems.csv", "main.csv"]
+    wb = openpyxl.load_workbook(tmp_path / "exports" / str(plan_id) / "v1" / "tables.xlsx")
+    assert wb.sheetnames == ["main", "LineItems"]

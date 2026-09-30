@@ -33,8 +33,8 @@ class AuditRecord(BaseModel):
 class AuditSink(Protocol):
     """Protocol for recording audit records."""
 
-    async def write(self, record: AuditRecord) -> None:
-        """Write an audit record to persistent storage."""
+    async def write(self, record: AuditRecord, session: Any | None = None) -> None:
+        """Write an audit record; in ``session``'s transaction when given."""
         ...
 
 
@@ -56,13 +56,14 @@ async def record_audit(
     object_id: str | None = None,
     details: dict[str, Any] | None = None,
     correlation_id: str | None = None,
+    session: Any | None = None,
     **kwargs: Any,
 ) -> None:
     """Record an audit event, delegating to the bound AuditSink if present."""
     global _sink
     pos = list(args)
     if pos and hasattr(pos[0], "execute"):
-        pos.pop(0)
+        session = session or pos.pop(0)
 
     fields = {
         "user_id": user_id,
@@ -104,4 +105,4 @@ async def record_audit(
         details=fields["details"] if fields["details"] is not None else {},
         correlation_id=fields["correlation_id"],
     )
-    await _sink.write(record)
+    await _sink.write(record, session)

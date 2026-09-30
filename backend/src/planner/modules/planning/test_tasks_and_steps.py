@@ -145,7 +145,7 @@ def test_build_steps_from_rules_ordering_and_mapping():
     # Check deduplicate params
     assert steps[6].parameters == {"subset": None}
     # Check arithmetic redundant drop params
-    assert steps[7].parameters == {"column": "total_redundant"}
+    assert steps[7].parameters == {"column": "total_redundant", "redundant_with": "subtotal"}
 
     # Compute loss for each step
     losses = [estimate_step_loss(df, s.operation, s.parameters) for s in steps]

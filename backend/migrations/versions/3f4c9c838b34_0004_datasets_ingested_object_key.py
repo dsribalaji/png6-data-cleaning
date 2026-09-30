@@ -22,9 +22,18 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _schema() -> str | None:
+    """The table lives in schema "datasets" on PostgreSQL; SQLite has one namespace."""
+    return "datasets" if op.get_bind().dialect.name == "postgresql" else None
+
+
 def upgrade() -> None:
-    op.add_column("datasets", sa.Column("ingested_object_key", sa.Text(), nullable=True))
+    op.add_column(
+        "datasets",
+        sa.Column("ingested_object_key", sa.Text(), nullable=True),
+        schema=_schema(),
+    )
 
 
 def downgrade() -> None:
-    op.drop_column("datasets", "ingested_object_key")
+    op.drop_column("datasets", "ingested_object_key", schema=_schema())

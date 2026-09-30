@@ -32,6 +32,7 @@ async def get_plan(session: AsyncSession, plan_id: UUID) -> PlanOut:
     # Audit defensively
     try:
         await record_audit(
+            session=session,
             event_type="plan.viewed",
             object_type="plan",
             object_id=str(plan_id),

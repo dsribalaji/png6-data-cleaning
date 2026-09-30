@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import json
+import zipfile
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 import uuid
@@ -10,6 +12,7 @@ import uuid
 import openpyxl
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from planner.core.audit import record_audit
 from planner.core.errors import AppError
 from planner.modules.execution.errors import ExecutionErrors
 from planner.modules.execution.models import ExportRow
@@ -22,14 +25,11 @@ async def create_export(
     req: ExportRequest,
     actor_id: UUID | None = None,
 ) -> ExportResponse:
-    """Export the current executed version of a dataset to xlsx or csv.
-
-    CSV format exports ONLY the main table.
-    XLSX format includes the main table and side tables as separate sheets.
-    """
+    """Export the current version: xlsx (one sheet per table), csv (zip, one file per
+    table) or pipeline (JSON list of the executed catalogue operations)."""
     fmt = req.format.lower()
-    if fmt not in ("xlsx", "csv"):
-        raise AppError("INVALID_FORMAT", "Format must be xlsx or csv.", 400)
+    if fmt not in ("xlsx", "csv", "pipeline"):
+        raise AppError("INVALID_FORMAT", "Format must be xlsx, csv or pipeline.", 400)
 
     from planner.modules.execution.public import (
         get_current_version_no,
@@ -42,7 +42,7 @@ async def create_export(
     if current <= 0:
         raise ExecutionErrors.NO_EXECUTED_VERSION
 
-    # Validation gate: export is blocked if latest validation did not pass
+    # Validation gate (FR-043): export is blocked if latest validation did not pass
     try:
         from planner.modules.validation.public import latest_validation_passed
 
@@ -53,34 +53,50 @@ async def create_export(
     if not validation_passed:
         raise ExecutionErrors.EXPORT_BLOCKED_TESTS_FAILED
 
-    df = await read_snapshot_frame(plan_id, current)
     storage = get_storage()
+    base = f"exports/{plan_id}/v{current}"
 
-    if fmt == "xlsx":
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "main"
-        ws.append(list(df.columns))
-        for row in df.iter_rows():
-            ws.append(list(row))
+    if fmt == "pipeline":
+        # FR-037: re-runnable definition = the executed catalogue ops, in order.
+        from planner.modules.planning.public import get_decided_steps
 
-        side_tables = await list_side_tables(plan_id, current)
-        for table_name, side_df in side_tables.items():
-            sheet_title = table_name[:31]  # Excel worksheet title max length
-            sws = wb.create_sheet(title=sheet_title)
-            sws.append(list(side_df.columns))
-            for row in side_df.iter_rows():
-                sws.append(list(row))
-
-        buf = io.BytesIO()
-        wb.save(buf)
-        data = buf.getvalue()
-        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        object_key = f"exports/{plan_id}/v{current}/main.xlsx"
-    else:  # csv
-        data = df.write_csv().encode("utf-8")
-        content_type = "text/csv"
-        object_key = f"exports/{plan_id}/v{current}/main.csv"
+        steps = await get_decided_steps(session, plan_id)
+        definition = {
+            "schemaVersion": 1,
+            "planId": str(plan_id),
+            "versionNo": current,
+            "steps": [
+                {"stepNo": st["step_no"], "operation": st["operation"], "parameters": st["parameters"]}
+                for st in steps
+            ],
+        }
+        data = json.dumps(definition, indent=2).encode("utf-8")
+        content_type = "application/json"
+        object_key = f"{base}/pipeline.json"
+    else:
+        tables = {"main": await read_snapshot_frame(plan_id, current)}
+        tables.update(await list_side_tables(plan_id, current))
+        if fmt == "xlsx":
+            wb = openpyxl.Workbook()
+            wb.remove(wb.active)
+            for table_name, frame in tables.items():
+                ws = wb.create_sheet(title=table_name[:31])  # Excel sheet title max 31
+                ws.append(list(frame.columns))
+                for row in frame.iter_rows():
+                    ws.append(list(row))
+            buf = io.BytesIO()
+            wb.save(buf)
+            data = buf.getvalue()
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            object_key = f"{base}/tables.xlsx"
+        else:  # csv: one file per table, zipped
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for table_name, frame in tables.items():
+                    zf.writestr(f"{table_name}.csv", frame.write_csv())
+            data = buf.getvalue()
+            content_type = "application/zip"
+            object_key = f"{base}/tables.csv.zip"
 
     await storage.put_object(object_key, data, content_type)
     download_url = await storage.presigned_get_url(object_key, expires_seconds=900)
@@ -96,6 +112,14 @@ async def create_export(
         exported_by=actor_id,
     )
     session.add(export_row)
+    await record_audit(
+        session=session,
+        user_id=actor_id,
+        event_type="plan.exported",
+        object_type="plan",
+        object_id=str(plan_id),
+        details={"format": fmt, "versionNo": current, "objectKey": object_key},
+    )
     await session.commit()
 
     return ExportResponse(download_url=download_url, expires_at=expires_at)

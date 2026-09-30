@@ -73,7 +73,7 @@ async def test_approve_plan_success(test_session: AsyncSession):
     test_session.add_all([step1, step2])
     await test_session.commit()
 
-    with patch("planner.worker.celery_app.send_task") as mock_send_task:
+    with patch("planner.worker.send_task_eager_aware") as mock_send_task:
         res = await approve_plan(test_session, plan.id)
         assert res.plan_id == plan.id
         assert res.status == "approved"

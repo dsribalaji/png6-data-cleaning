@@ -32,6 +32,7 @@ async def get_profile(session: AsyncSession, dataset_id: UUID) -> ProfileRespons
     # Record audit defensively
     try:
         await record_audit(
+            session=session,
             event_type="dataset.profile_viewed",
             object_type="dataset",
             object_id=str(dataset_id),

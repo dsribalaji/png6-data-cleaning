@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import zipfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -89,7 +89,7 @@ async def test_upload_dataset__valid_csv__creates_dataset_job_and_outbox(
     csv_bytes = b"invoice_id,amount,vendor\nINV001,100.50,Acme Corp\nINV002,200.00,Beta LLC"
     upload_file = UploadFile(file=io.BytesIO(csv_bytes), filename="invoices.csv")
 
-    with patch("planner.worker.celery_app.send_task") as mock_send_task:
+    with patch("planner.worker.dispatch_task", new_callable=AsyncMock) as mock_send_task:
         result = await upload_dataset_service(
             file=upload_file,
             session=async_session,

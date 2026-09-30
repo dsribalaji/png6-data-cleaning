@@ -9,7 +9,7 @@ dependencies = [
     "gunicorn",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "sqlalchemy>=2.0",
+    "sqlalchemy[asyncio]>=2.0",
     "alembic>=1.13",
     "asyncpg",
     "aiosqlite",
@@ -18,7 +18,7 @@ dependencies = [
     "redis",
     "sse-starlette",
     "boto3",
-    "polars",
+    "polars[rtcompat]",
     "pyarrow",
     "duckdb",
     "fastexcel",
@@ -59,7 +59,7 @@ build-backend = "hatchling.build"
 packages = ["src/planner"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src"]
 asyncio_mode = "auto"
 
 [tool.ruff]

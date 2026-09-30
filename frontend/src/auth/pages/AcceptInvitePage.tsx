@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { IconEye, IconEyeOff } from "@tabler/icons-react";
 import { api, ApiError } from "../../api/client";
-import type { AuthResponse } from "../../api/schema";
+import type { AuthResponse, User } from "../../api/schema";
 import { useSessionStore } from "../session.store";
 import { getRoleLandingRoute } from "../permissions";
 import { MESSAGES } from "../../shared/constants/messages";
@@ -62,8 +62,13 @@ export function AcceptInvitePage() {
         })
         .json<AuthResponse>();
 
-      setSession(data.accessToken, data.user);
-      navigate(getRoleLandingRoute(data.user.role));
+      // The accept response carries only the token; the role comes from /auth/me.
+      const user = await api
+        .get("auth/me", { headers: { Authorization: `Bearer ${data.accessToken}` } })
+        .json<User>();
+
+      setSession(data.accessToken, user);
+      navigate(getRoleLandingRoute(user.role));
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setServerError(err.detail || err.title || "Failed to set password. The invite link may have expired.");

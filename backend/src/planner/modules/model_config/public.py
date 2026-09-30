@@ -78,4 +78,25 @@ async def resolve_llm_config(session: AsyncSession) -> ResolvedModelConfig | Non
     )
 
 
-__all__ = ["get_active_model_config", "resolve_llm_config", "ModelConfig"]
+from planner.modules.model_config.features.get_model_config.router import (  # noqa: E402
+    router as get_model_config_router,
+)
+from planner.modules.model_config.features.list_providers.router import (  # noqa: E402
+    router as list_providers_router,
+)
+from planner.modules.model_config.features.test_model_connection.router import (  # noqa: E402
+    router as test_model_connection_router,
+)
+from planner.modules.model_config.features.update_model_config.router import (  # noqa: E402
+    router as update_model_config_router,
+)
+
+# Static /providers and /test before any parameterised path.
+routers = [
+    list_providers_router,
+    test_model_connection_router,
+    get_model_config_router,
+    update_model_config_router,
+]
+
+__all__ = ["get_active_model_config", "resolve_llm_config", "ModelConfig", "routers"]

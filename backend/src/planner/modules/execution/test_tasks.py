@@ -25,21 +25,7 @@ async def setup_db(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("STORAGE_LOCAL_ROOT", str(tmp_path))
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
-    from sqlalchemy import Column, Table, Uuid
-
-    if (
-        "planning.plan_steps" not in Base.metadata.tables
-        and "plan_steps" not in Base.metadata.tables
-    ):
-        Table(
-            "plan_steps",
-            Base.metadata,
-            Column("id", Uuid, primary_key=True),
-            schema="planning",
-        )
-
-    for table in Base.metadata.tables.values():
-        table.schema = None
+    # SQLite schemas are mapped in core.db; conftest registers every model.
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -115,7 +101,7 @@ async def test_execute_plan_success_and_idempotency(setup_db, monkeypatch):
     mock_planning.get_decided_steps = AsyncMock(return_value=steps)
     monkeypatch.setitem(sys.modules, "planner.modules.planning.public", mock_planning)
 
-    with patch("planner.worker.celery_app.send_task") as mock_send_task:
+    with patch("planner.modules.execution.tasks.send_task_eager_aware") as mock_send_task:
         res = await _async_execute_plan(str(plan_id), str(job_id))
         assert res["plan_id"] == str(plan_id)
         assert res["versions"] == 1

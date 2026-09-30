@@ -349,7 +349,14 @@ export function RunPage() {
   const canExport = usePermission("export");
 
   const steps = useMemo(() => plan?.steps ?? [], [plan]);
-  const progress = useMemo(() => deriveRunProgress(lastEvent, steps), [lastEvent, steps]);
+  const progress = useMemo(() => {
+    // Step i writes version v{i}; a step whose version exists is done even if the
+    // live event was missed (SSE reconnecting, page opened after the run).
+    const latest = Math.max(0, ...(versionsQuery.data ?? []).map((v) => v.n));
+    return deriveRunProgress(lastEvent, steps).map((p, i): StepProgress =>
+      p.status === "queued" && latest >= i + 1 ? { status: "succeeded", progressPct: 100 } : p
+    );
+  }, [lastEvent, steps, versionsQuery.data]);
 
   const validation = validationQuery.data;
   const versions = versionsQuery.data;

@@ -13,6 +13,7 @@ import polars as pl
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from planner.core.audit import record_audit
 from planner.core.db import SessionLocal
 from planner.core.events import (
     DatasetProfiledPayload,
@@ -237,6 +238,13 @@ async def _profile_dataset_impl(dataset_id_str: str, job_id_str: str) -> dict[st
             DatasetProfiledPayload(dataset_id=dataset_id),
         )
         await session.commit()
+        await record_audit(
+            session=session,
+            event_type="dataset.profiled",
+            object_type="dataset",
+            object_id=str(dataset_id),
+            details={"rows": profile.row_count, "columns": profile.column_count},
+        )
 
     # Defensive realtime notification
     try:
@@ -343,6 +351,13 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
             RulesInferredPayload(dataset_id=dataset_id, rule_count=len(merged)),
         )
         await session.commit()
+        await record_audit(
+            session=session,
+            event_type="rules.inferred",
+            object_type="dataset",
+            object_id=str(dataset_id),
+            details={"rules": len(merged)},
+        )
 
     # Defensive realtime notification
     try:

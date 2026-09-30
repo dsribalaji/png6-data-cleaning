@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { IconEye, IconEyeOff } from "@tabler/icons-react";
 import { api, ApiError } from "../../api/client";
-import type { AuthResponse } from "../../api/schema";
+import type { AuthResponse, User } from "../../api/schema";
 import { useSessionStore } from "../session.store";
 import { getRoleLandingRoute } from "../permissions";
 import { MESSAGES } from "../../shared/constants/messages";
@@ -48,7 +48,7 @@ export function LoginPage() {
   const onSubmit = async (values: LoginFormData) => {
     setServerError(null);
     try {
-      const data = await api
+      const { accessToken } = await api
         .post("auth/login", {
           json: {
             email: values.email,
@@ -57,8 +57,13 @@ export function LoginPage() {
         })
         .json<AuthResponse>();
 
-      setSession(data.accessToken, data.user);
-      navigate(getRoleLandingRoute(data.user.role));
+      // The login response carries only the token; the role comes from /auth/me (PRD §5).
+      const user = await api
+        .get("auth/me", { headers: { Authorization: `Bearer ${accessToken}` } })
+        .json<User>();
+
+      setSession(accessToken, user);
+      navigate(getRoleLandingRoute(user.role));
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.status === 401 || err.code === "INVALID_CREDENTIALS") {

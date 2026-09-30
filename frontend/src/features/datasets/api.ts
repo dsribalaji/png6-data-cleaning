@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { api, ApiError } from "../../api/client";
 import type {
+  ColumnProfile,
   Dataset,
   DatasetDetail,
   DatasetProfile,
@@ -226,14 +227,11 @@ export function useUploadDataset() {
       form.append("source", source);
 
       try {
-        const data = await api
-          .post("datasets", {
-            body: form,
-            onUploadProgress(progress) {
-              onProgress?.(Math.round(progress.percent));
-            },
-          })
-          .json<unknown>();
+        // ponytail: coarse 0 → 100 progress. ky's onUploadProgress streams the body
+        // (duplex "half"), which Chrome rejects over HTTP/1.1; use XHR for a real bar.
+        onProgress?.(0);
+        const data = await api.post("datasets", { body: form }).json<unknown>();
+        onProgress?.(100);
         return normalizeUploadResponse(data);
       } catch (error) {
         const maxMb = maxUploadMbFromCache(queryClient);
@@ -314,10 +312,44 @@ export function useProfile(
 ) {
   return useQuery<DatasetProfile>({
     queryKey: datasetKeys.profile(id ?? ""),
-    queryFn: () => api.get(`datasets/${id}/profile`).json<DatasetProfile>(),
+    queryFn: async () => toDatasetProfile(await api.get(`datasets/${id}/profile`).json<RawProfile>()),
     enabled: Boolean(id),
     ...options,
   });
+}
+
+/** GET /datasets/{id}/profile as the API sends it. */
+interface RawProfile {
+  datasetId: string;
+  rowCount: number;
+  columnCount: number;
+  quarantinedRowsCount?: number;
+  columns: Array<Omit<ColumnProfile, "columnName" | "id" | "datasetId"> & { name: string }>;
+}
+
+/** API → view model: column names, null share 0–1 → percent, summary KPIs derived. */
+export function toDatasetProfile(raw: RawProfile): DatasetProfile {
+  const columns: ColumnProfile[] = raw.columns.map((c) => ({
+    ...c,
+    id: `${raw.datasetId}:${c.name}`,
+    datasetId: raw.datasetId,
+    columnName: c.name,
+    nullPct: c.nullPct * 100,
+    flags: c.flags ?? [],
+  }));
+  return {
+    datasetId: raw.datasetId,
+    columns,
+    summary: {
+      rowCount: raw.rowCount,
+      columnCount: raw.columnCount,
+      columnsWithNullsCount: columns.filter((c) => c.nullCount > 0).length,
+      nestedColumnsCount: columns.filter(
+        (c) => c.semanticType === "nested_json" || c.flags.includes("nested_json")
+      ).length,
+      quarantinedRowsCount: raw.quarantinedRowsCount ?? 0,
+    },
+  };
 }
 
 /** GET /datasets/{id}/rules — rules inferred from the profiled data. */
@@ -343,7 +375,9 @@ export function useGeneratePlan() {
         .post(`datasets/${id}/plans`, {
           json: lossThreshold === undefined ? {} : { lossThreshold },
         })
-        .json<GeneratePlanResponse>(),
+        .json<GeneratePlanResponse & { id?: string; steps?: unknown[] }>()
+        // The API answers with the plan itself; eager/local mode already includes its steps.
+        .then((plan) => ({ ...plan, planId: plan.planId ?? plan.id, stepCount: plan.steps?.length ?? 0 })),
     onSuccess: (data) => {
       if (data.planId) {
         queryClient.invalidateQueries({ queryKey: ["plans", data.planId] });

@@ -44,6 +44,7 @@ async def deactivate_user_service(
     await session.refresh(user)
 
     await record_audit(
+            session=session,
         user_id=actor.user_id,
         user_role=actor.role,
         event_type="users.deactivate",

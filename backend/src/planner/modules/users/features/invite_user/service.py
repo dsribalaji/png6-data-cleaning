@@ -63,6 +63,7 @@ async def invite_user_service(
     await session.commit()
 
     await record_audit(
+            session=session,
         user_id=actor.user_id,
         user_role=actor.role,
         event_type="users.invite",

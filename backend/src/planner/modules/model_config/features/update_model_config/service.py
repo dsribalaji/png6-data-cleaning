@@ -68,6 +68,7 @@ async def update_model_config(
     # 5. Record audit event
     # NOTE: record_audit is currently a not-started stub owned by worker W1; wired per specification
     await record_audit(
+            session=session,
         user_id=actor_id,
         user_role=actor_role,
         event_type="model_config.updated",

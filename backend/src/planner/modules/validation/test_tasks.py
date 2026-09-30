@@ -24,23 +24,7 @@ from planner.modules.validation.tasks import _async_generate_tests, _async_run_v
 async def setup_db(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("STORAGE_LOCAL_ROOT", str(tmp_path))
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-
-    from sqlalchemy import Column, Table, Uuid
-
-    if (
-        "planning.plan_steps" not in Base.metadata.tables
-        and "plan_steps" not in Base.metadata.tables
-    ):
-        Table(
-            "plan_steps",
-            Base.metadata,
-            Column("id", Uuid, primary_key=True),
-            schema="planning",
-        )
-
-    for table in Base.metadata.tables.values():
-        table.schema = None
-
+    # SQLite schemas are mapped away in core.db; all models are registered by conftest.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -106,7 +90,7 @@ async def test_generate_tests_task(setup_db, monkeypatch):
     )
     monkeypatch.setitem(sys.modules, "planner.modules.profiling.public", mock_prof)
 
-    with patch("planner.worker.celery_app.send_task") as mock_send_task:
+    with patch("planner.modules.validation.tasks.send_task_eager_aware") as mock_send_task:
         res = await _async_generate_tests(str(plan_id), str(job_id))
         assert res["tests"] >= 2
 
@@ -168,6 +152,19 @@ async def test_run_validation_task(setup_db, monkeypatch, tmp_path: Path):
     session.add(tc)
     await session.commit()
 
+    mock_planning = types.ModuleType("planner.modules.planning.public")
+    mock_planning.get_decided_steps = AsyncMock(
+        return_value=[
+            {
+                "id": uuid.uuid4(),
+                "step_no": 1,
+                "operation": "expand_nested",
+                "parameters": {"column": "line_items", "key_column": "_row", "child_table": "LineItems"},
+            }
+        ]
+    )
+    monkeypatch.setitem(sys.modules, "planner.modules.planning.public", mock_planning)
+
     res = await _async_run_validation(str(plan_id), str(job_id), 1)
     assert res["passed"] is True
     assert res["tests"] == 1
@@ -189,10 +186,11 @@ async def test_run_validation_task(setup_db, monkeypatch, tmp_path: Path):
             select(ReconciliationRow).where(ReconciliationRow.plan_id == plan_id)
         )
     ).scalars().all()
-    rec_names = {r.check_name for r in recs}
-    assert "gross_total" in rec_names
-    assert "invoice_row_count" in rec_names
-    assert "line_item_count" in rec_names
+    by_name = {r.check_name: (r.source_value, r.output_value) for r in recs}
+    assert by_name["row_count"] == ("2", "2")
+    assert by_name["row_count:LineItems"] == ("2", "2")
+    # recomputed from the source JSON, not copied from the child table
+    assert by_name["sum:LineItems.amount"] == ("150", "150")
     assert all(r.ok is True for r in recs)
 
     # Verify OutboxEvent

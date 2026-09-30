@@ -93,6 +93,7 @@ async def decide_step(
     # Defensive audit
     try:
         await record_audit(
+            session=session,
             event_type="plan.step_decided",
             object_type="plan_step",
             object_id=str(step.id),

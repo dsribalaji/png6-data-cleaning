@@ -51,9 +51,11 @@ export interface LoginRequest {
   password: string;
 }
 
+/** POST /auth/login. The user profile is fetched separately from GET /auth/me. */
 export interface AuthResponse {
   accessToken: string;
-  user: User;
+  tokenType?: string;
+  expiresIn?: number;
 }
 
 export interface RefreshResponse {

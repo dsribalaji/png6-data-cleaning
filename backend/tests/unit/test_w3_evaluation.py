@@ -34,19 +34,6 @@ from planner.core.outbox import OutboxEvent
 from planner.modules.evaluation.tasks import _run_evaluation_async
 
 
-@pytest.fixture(scope="session", autouse=True)
-def strip_evaluation_schemas() -> None:
-    """Per contract §7: strip schemas first before create_all on SQLite."""
-    BenchmarkSet.__table__.schema = None
-    EvaluationRun.__table__.schema = None
-    EvaluationRun.__table__.foreign_keys.clear()
-    for col in EvaluationRun.__table__.c:
-        col.foreign_keys.clear()
-    EvaluationRun.__table__.constraints = {
-        c for c in EvaluationRun.__table__.constraints if not isinstance(c, ForeignKeyConstraint)
-    }
-
-
 from sqlalchemy.pool import StaticPool
 
 
@@ -59,15 +46,9 @@ async def sqlite_engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    # All tables (SQLite schemas are mapped in core.db); services also write audit rows.
     async with engine.begin() as conn:
-        await conn.run_sync(
-            Base.metadata.create_all,
-            tables=[
-                BenchmarkSet.__table__,
-                EvaluationRun.__table__,
-                OutboxEvent.__table__,  # task emits evaluation.completed
-            ],
-        )
+        await conn.run_sync(Base.metadata.create_all)
     yield engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

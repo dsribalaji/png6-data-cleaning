@@ -314,7 +314,7 @@ def build_steps_from_rules(
                     arithmetic_drop_steps.append(
                         StepCandidate(
                             operation="drop_column",
-                            parameters={"column": target},
+                            parameters={"column": target, "redundant_with": formula},
                             rationale=f"redundant: equals {formula} on all rows",
                             confidence=float(getattr(r, "confidence", 1.0)),
                         )
@@ -478,6 +478,7 @@ async def _generate_plan_impl(
         db_plan = await session.get(Plan, plan_id)
         if db_plan:
             db_plan.total_estimated_loss = total_loss
+        threshold = float(db_plan.loss_threshold) if db_plan and db_plan.loss_threshold is not None else 0.05
 
         for i, (cand, loss) in enumerate(zip(final_steps, step_losses), start=1):
             step_row = PlanStep(
@@ -487,7 +488,9 @@ async def _generate_plan_impl(
                 parameters=cand.parameters,
                 rationale=cand.rationale,
                 confidence=cand.confidence,
-                decision="pending",
+                # PRD S5 / FR-031: steps at or under the loss threshold default to Accept;
+                # only steps above it are held for an explicit decision.
+                decision="accepted" if loss.estimated_loss <= threshold else "pending",
             )
             session.add(step_row)
             await session.flush()

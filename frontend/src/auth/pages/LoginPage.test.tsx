@@ -88,18 +88,15 @@ describe("LoginPage sign-in", () => {
 
   it("lands an administrator on the model settings page", async () => {
     server.use(
-      http.post("*/api/v1/auth/login", () =>
+      http.get("*/api/v1/auth/me", () =>
         HttpResponse.json({
-          accessToken: MSW_ACCESS_TOKEN,
-          user: {
-            id: "user-2",
-            email: "admin@example.com",
-            firstName: "Ada",
-            lastName: "Admin",
-            role: "administrator",
-            status: "active",
-            createdAt: "2026-01-05T09:00:00Z",
-          },
+          id: "user-2",
+          email: "admin@example.com",
+          firstName: "Ada",
+          lastName: "Admin",
+          role: "administrator",
+          status: "active",
+          createdAt: "2026-01-05T09:00:00Z",
         })
       )
     );

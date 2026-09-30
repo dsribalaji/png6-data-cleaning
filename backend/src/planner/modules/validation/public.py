@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from planner.modules.validation.features.get_validation.router import (
     router as get_validation_router,
 )
-from planner.modules.validation.models import TestCaseRow, TestRunRow
+from planner.modules.validation.models import ReconciliationRow, TestCaseRow, TestRunRow
 
 # Mount: app.include_router(r, prefix='/api/v1') for r in routers
 routers = [get_validation_router]
@@ -44,7 +44,11 @@ async def latest_validation_passed(
         if run is None or run.result != "passed":
             return False
 
-    return True
+    rec_stmt = select(ReconciliationRow.ok).where(
+        ReconciliationRow.plan_id == plan_id, ReconciliationRow.version_no == version_no
+    )
+    recs = list((await session.execute(rec_stmt)).scalars().all())
+    return bool(recs) and all(recs)
 
 
 __all__ = ["latest_validation_passed", "routers"]

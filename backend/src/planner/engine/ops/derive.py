@@ -6,6 +6,7 @@ Pure data logic - no FastAPI/DB imports.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, ClassVar
 from dateutil import parser as date_parser
 import polars as pl
@@ -198,7 +199,7 @@ class ExpandNestedOperation(Operation):
         else:
             child_df = pl.DataFrame()
 
-        return {child_table: child_df}
+        return {child_table: _coerce_numeric_text(child_df)}
 
     def inverse(
         self, before: pl.DataFrame, after: pl.DataFrame, params: dict[str, Any]
@@ -218,18 +219,41 @@ class ExpandNestedOperation(Operation):
         )
 
     def estimate_loss(self, df: pl.DataFrame, params: dict[str, Any]) -> LossEstimate:
+        # Every cell is rewritten (JSON -> item count), but the content moves to the
+        # child table; only non-empty cells that fail to parse are actually lost.
+        col = params["column"]
         total_cells = df.height * df.width
-        cells_affected = df.height
-        pct = (cells_affected / total_cells) if total_cells > 0 else 0.0
-
+        cells = df[col].to_list()
+        affected = sum(1 for c in cells if c is not None)
+        lost = sum(1 for c in cells if c not in (None, "") and not self._parse_cell(c))
         return LossEstimate(
             op=self.name,
-            rows_affected=df.height,
-            columns_affected=1 if total_cells > 0 else 0,
-            cells_affected=cells_affected,
-            cells_affected_pct=pct,
-            estimated_loss=pct,
+            rows_affected=affected,
+            columns_affected=1 if affected else 0,
+            cells_affected=affected,
+            cells_affected_pct=(affected / total_cells) if total_cells else 0.0,
+            estimated_loss=(lost / total_cells) if total_cells else 0.0,
         )
+
+
+_NUMERIC_TEXT = re.compile(r"^\s*[-+]?\$?\s*(\d{1,3}(,\d{3})+|\d+)?(\.\d+)?\s*$")
+
+
+def _coerce_numeric_text(df: pl.DataFrame) -> pl.DataFrame:
+    """Cast String columns whose every value is numeric text ("$140.00", "4,735.12")
+    to Float64 (dollar-text-in-json), rounding binary float artifacts to cents."""
+    out = []
+    for name in df.columns:
+        s = df[name]
+        vals = s.drop_nulls().to_list() if s.dtype == pl.String else []
+        if vals and all(v.strip() and _NUMERIC_TEXT.match(v) for v in vals):
+            nums = s.str.replace_all(r"[\$,\s]", "").cast(pl.Float64)
+            if (nums - nums.round(2)).abs().max() < 1e-6:  # float-artifacts
+                nums = nums.round(2)
+            out.append(nums)
+        else:
+            out.append(s)
+    return pl.DataFrame(out) if out else df
 
 
 class StandardiseFormatOperation(Operation):
