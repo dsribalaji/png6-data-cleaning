@@ -1,0 +1,9 @@
+mode: brief
+status: draft
+project: png6-data-cleaning
+team: TITAN
+team_id: NCS26GA-46
+event: CodeStorm 2K26
+problem_statement: PNG6 - Agentic Data Cleaning Planner
+date: 2026-09-30
+handoff: docs/architecture/brief-handoff.md

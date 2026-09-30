@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "png6-data-cleaning"
+version = "0.1.0"
+description = "Agentic Data Cleaning Planner MVP backend"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg2-binary",
+    "celery[redis,rabbitmq]",
+    "redis",
+    "minio",
+    "polars",
+    "duckdb",
+    "pyarrow",
+    "litellm",
+    "pyjwt",
+    "argon2-cffi",
+    "python-multipart",
+    "openpyxl",
+    "sse-starlette",
+    "httpx",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

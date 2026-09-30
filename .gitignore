@@ -1,0 +1,26 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# Env / secrets — never commit real values; .env.example carries placeholders only
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# NOTE: keep Alembic migration files tracked (do NOT ignore backend/alembic/versions/).
