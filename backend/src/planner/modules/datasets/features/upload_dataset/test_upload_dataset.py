@@ -132,6 +132,7 @@ async def test_upload_dataset__valid_csv__creates_dataset_job_and_outbox(
     mock_send_task.assert_called_once_with(
         "planner.modules.datasets.tasks.ingest_dataset",
         kwargs={"dataset_id": str(result.id), "job_id": str(job.id)},
+        wait=False,
     )
 
 

@@ -24,7 +24,7 @@ from planner.modules.validation.models import ReconciliationRow, TestCaseRow, Te
 from planner.worker import celery_app, send_task_eager_aware
 
 
-def _build_table_profile(col_rows: list[Any]) -> TableProfile:
+def _build_table_profile(col_rows: list[Any], row_count: int = 0) -> TableProfile:
     """Construct a TableProfile from profiling column rows or dictionaries."""
     columns: list[ColumnProfile] = []
     for idx, r in enumerate(col_rows):
@@ -65,7 +65,7 @@ def _build_table_profile(col_rows: list[Any]) -> TableProfile:
 
     return TableProfile(
         table_name="dataset",
-        row_count=0,
+        row_count=row_count,
         column_count=len(columns),
         columns=columns,
         issues=[],
@@ -98,15 +98,18 @@ async def _async_generate_tests(plan_id: str, job_id: str) -> dict[str, Any]:
 
         # Lazy import profiling.public (defensive)
         col_rows = []
+        row_count = 0
         try:
-            from planner.modules.profiling.public import get_column_profile_rows
+            from planner.modules.profiling.public import get_column_profile_rows, get_profile_run
 
             if plan and hasattr(plan, "dataset_id"):
                 col_rows = await get_column_profile_rows(session, plan.dataset_id)
+                run = await get_profile_run(session, plan.dataset_id)
+                row_count = int(getattr(run, "row_count", 0) or 0)
         except Exception:
             col_rows = []
 
-        profile = _build_table_profile(col_rows)
+        profile = _build_table_profile(col_rows, row_count)
 
         plan_steps_dicts = [
             {

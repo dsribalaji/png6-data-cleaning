@@ -158,12 +158,16 @@ def send_task_eager_aware(
     task.apply_async(args=args or [], kwargs=kwargs or {}, queue=queue)
 
 
+_background: set[Any] = set()  # strong refs so fire-and-forget jobs aren't GC'd mid-run
+
+
 async def dispatch_task(
     name: str,
     *,
     args: list | None = None,
     kwargs: dict | None = None,
     queue: str | None = None,
+    wait: bool = True,
 ) -> None:
     """Send a Celery task from async API code.
 
@@ -178,7 +182,14 @@ async def dispatch_task(
         # Eager-aware: task_always_eager is ignored by send_task().
         send_task_eager_aware(name, args=args, kwargs=kwargs, queue=queue)
 
-    await _asyncio.to_thread(_send)
+    if wait:
+        await _asyncio.to_thread(_send)
+        return
+    # Eager mode runs the whole job inline; don't hold the HTTP request open for it
+    # (the client follows progress over SSE). Broker mode publishes and returns fast anyway.
+    job = _asyncio.create_task(_asyncio.to_thread(_send))
+    _background.add(job)
+    job.add_done_callback(_background.discard)
 
 
 def describe() -> dict[str, Any]:

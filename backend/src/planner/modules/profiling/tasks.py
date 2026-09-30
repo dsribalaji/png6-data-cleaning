@@ -263,17 +263,7 @@ async def _profile_dataset_impl(dataset_id_str: str, job_id_str: str) -> dict[st
     except (NotImplementedError, Exception):
         pass
 
-    # Update dataset status BEFORE chaining (integration 2026-09-30: the
-    # infer task sets 'ready_for_plan' after; doing this after the chain
-    # would overwrite it).
-    try:
-        from planner.modules.datasets.public import update_dataset_status
-
-        async with SessionLocal() as session:
-            await update_dataset_status(session, dataset_id, "profiled")
-            await session.commit()
-    except (NotImplementedError, Exception):
-        pass
+    # The dataset stays "profiling" until the chained infer task has saved its rules.
 
     # Chain next task: planner.infer_rules
     send_task_eager_aware("planner.infer_rules", args=[dataset_id_str, job_id_str], queue="profile")
@@ -381,7 +371,8 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
         from planner.modules.datasets.public import update_dataset_status
 
         async with SessionLocal() as session:
-            await update_dataset_status(session, dataset_id, "ready_for_plan")
+            # Profile and rules are both saved: the dataset is ready for a plan.
+            await update_dataset_status(session, dataset_id, "profiled")
             await session.commit()
     except (NotImplementedError, Exception):
         pass

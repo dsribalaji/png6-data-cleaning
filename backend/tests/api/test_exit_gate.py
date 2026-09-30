@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import runpy
+import time
 import zipfile
 from pathlib import Path
 
@@ -56,7 +57,12 @@ def test_exit_gate__reference_invoice_file__upload_to_validated_export_and_rollb
 
     # ingest + profile + infer run on upload
     ds = _ok(client.post(f"{api}/datasets", files={"file": (REFERENCE.name, original_bytes)}))
-    ds = _ok(client.get(f"{api}/datasets/{ds['id']}"))
+    # Upload returns at once; ingest + profile run in the background.
+    for _ in range(120):
+        ds = _ok(client.get(f"{api}/datasets/{ds['id']}"))
+        if ds["status"] != "profiling":
+            break
+        time.sleep(0.5)
     assert (ds["status"], ds["rowCount"], ds["columnCount"]) == ("profiled", 22, 14)
 
     rules = _ok(client.get(f"{api}/datasets/{ds['id']}/rules"))["items"]

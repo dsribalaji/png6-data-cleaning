@@ -70,7 +70,7 @@ services:
     env_file:
       - ../.env
     # Migrate + seed the demo users (idempotent), then serve.
-    command: sh -c "alembic upgrade head && python scripts/seed_demo.py && exec gunicorn planner.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 300"
+    command: sh -c "alembic upgrade head && python scripts/seed_demo.py && exec gunicorn planner.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 300 --keep-alive 75"
     volumes:
       - storage:/app/storage
     ports:

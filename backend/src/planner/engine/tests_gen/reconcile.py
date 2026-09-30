@@ -52,6 +52,18 @@ def _sum(series: pl.Series) -> float:
     return float(series.cast(pl.Float64, strict=False).fill_null(0).sum())
 
 
+def _source_sum(series: pl.Series) -> float | None:
+    """Sum of a source column, parsing numeric text ("$1,234.50"); None if not numeric."""
+    if series.dtype.is_numeric():
+        return _sum(series)
+    if series.dtype != pl.String:
+        return None
+    values = [_num(v) for v in series.drop_nulls().to_list()]
+    if not values or any(v is None for v in values):
+        return None
+    return float(sum(values))  # type: ignore[arg-type]
+
+
 def _check(name: str, src: float, out: float) -> Reconciliation:
     return Reconciliation(name, round(src, 2), round(out, 2), abs(src - out) < _TOL)
 
@@ -69,26 +81,29 @@ def reconcile(
     ops = [(s.get("operation") or s.get("op"), s.get("parameters") or s.get("params") or {}) for s in steps]
     out: list[Reconciliation] = []
 
-    # 1. Parent row count (deduplicate may legitimately remove rows).
-    dedup = any(op == "deduplicate" for op, _ in ops)
-    out.append(
-        Reconciliation(
-            "row_count",
-            before.height,
-            after.height,
-            after.height <= before.height if dedup else after.height == before.height,
-        )
-    )
+    # 1. Parent row count. Exact duplicates removed by a deduplicate step are expected
+    #    to be gone, so the source baseline drops them the same way.
+    dedup = [p for op, p in ops if op == "deduplicate"]
+    base = before
+    if dedup:
+        subset = dedup[0].get("subset")
+        # ponytail: dedup baseline on raw values; duplicates that only appear after
+        # normalisation make this check fail (export blocked) rather than pass silently.
+        base = before.unique(subset=subset, keep="first", maintain_order=True)
+    label = "row_count" if base.height == before.height else "row_count (exact duplicates removed)"
+    out.append(Reconciliation(label, base.height, after.height, after.height == base.height))
 
     # 2. Numeric column totals; a dropped redundant column is checked against its twin.
     twins = {p["column"]: p["redundant_with"] for op, p in ops if op == "drop_column" and p.get("redundant_with")}
-    numeric = [c for c in before.columns if before[c].dtype.is_numeric()]
     sums: dict[str, tuple[float, float]] = {}
-    for col in numeric:
+    for col in before.columns:
         target = col if col in after.columns else twins.get(col)
-        if target is None or target not in after.columns:
+        if target is None or target not in after.columns or not after[target].dtype.is_numeric():
             continue
-        sums[col] = (_sum(before[col]), _sum(after[target]))
+        src = _source_sum(base[col])
+        if src is None:
+            continue
+        sums[col] = (src, _sum(after[target]))
         label = col if target == col else f"{col} (= {target})"
         out.append(_check(f"sum:{label}", *sums[col]))
 

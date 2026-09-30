@@ -4,7 +4,7 @@ import { chromium } from "@playwright/test";
 
 const BASE = process.env.BASE ?? "http://localhost:5199";
 const SHOTS = process.env.SHOTS ?? "/tmp";
-const REF = new URL("../../data/reference/VendorInvoices_uncleaned.xlsx", import.meta.url).pathname;
+const REF = process.env.FILE ?? new URL("../../data/reference/VendorInvoices_uncleaned.xlsx", import.meta.url).pathname;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome" });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
@@ -33,15 +33,15 @@ try {
   if (await nameBox.count()) await nameBox.fill(`golden ${Date.now()}`);
   await shot("upload-modal");
   await page.getByRole("dialog").getByRole("button", { name: "Upload & profile" }).last().click();
-  await page.getByRole("link", { name: /golden/i }).first().waitFor({ timeout: 60000 });
+  await page.getByRole("link", { name: /golden/i }).first().waitFor({ timeout: 240000 });
   await page.waitForTimeout(1500);
   await shot("datasets-after-upload");
 
   await page.getByRole("link", { name: /golden/i }).first().click();
-  await page.getByRole("button", { name: "Generate plan" }).waitFor({ timeout: 60000 });
+  await page.getByRole("button", { name: "Generate plan" }).waitFor({ timeout: 240000 });
   await shot("profile");
   await page.getByRole("button", { name: "Generate plan" }).click();
-  await page.waitForURL(/\/plans\//, { timeout: 60000 });
+  await page.waitForURL(/\/plans\//, { timeout: 240000 });
   await page.getByRole("button", { name: /Approve plan/ }).waitFor();
   await shot("plan-review");
 
@@ -52,14 +52,14 @@ try {
   await shot("plan-decided");
   await page.getByRole("button", { name: /Approve plan/ }).click();
   await page.getByRole("button", { name: "Confirm" }).click();
-  await page.waitForURL(/\/run/, { timeout: 60000 });
-  await page.getByText(/154,?292/).first().waitFor({ timeout: 60000 }).catch(() => {});
+  await page.waitForURL(/\/run/, { timeout: 240000 });
+  await page.getByText(/154,?292/).first().waitFor({ timeout: 240000 }).catch(() => {});
   await page.waitForTimeout(2000);
   await shot("run");
 
   for (const fmt of ["XLSX", "CSV", "Pipeline"]) {
     const btn = page.getByRole("button", { name: new RegExp(fmt, "i") }).first();
-    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 30000 }), btn.click()]);
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 180000 }), btn.click()]);
     console.log(`export ${fmt}: ${dl.suggestedFilename()}`);
   }
 

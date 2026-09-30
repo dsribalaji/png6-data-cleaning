@@ -53,7 +53,6 @@ def generate_checks(plan_steps: list[dict[str, Any]], profile: TableProfile) -> 
         "date": "Date",
     }
 
-    all_col_names = [col.name for col in profile.columns]
 
     for step in plan_steps:
         step_no = step.get("step_no", 0)
@@ -158,18 +157,18 @@ def generate_checks(plan_steps: list[dict[str, Any]], profile: TableProfile) -> 
 
         elif op == "deduplicate":
             subset = params.get("subset")
-            cols = subset if subset is not None else list(all_col_names)
-            is_single = len(cols) == 1
+            is_single = subset is not None and len(subset) == 1
+            # No subset = whole-row duplicates: check every column present at check
+            # time (earlier steps may have dropped some of the profiled columns).
+            definition: dict[str, Any] = {"check": "unique", "table": "main"}
+            if subset is not None:
+                definition["columns"] = list(subset)
             cases.append(
                 TestCase(
                     name=f"step_{step_no}_deduplicate",
                     type="unit" if is_single else "integration",
-                    target=cols[0] if is_single else None,
-                    definition={
-                        "check": "unique",
-                        "columns": cols,
-                        "table": "main",
-                    },
+                    target=subset[0] if is_single else None,
+                    definition=definition,
                 )
             )
 
@@ -177,7 +176,12 @@ def generate_checks(plan_steps: list[dict[str, Any]], profile: TableProfile) -> 
     # 1. Identifier columns -> unique check
     for col_prof in profile.columns:
         is_identifier = col_prof.semantic_type == "identifier" or "identifier" in col_prof.flags
-        if is_identifier and col_prof.name not in dropped_columns:
+        # Only assert uniqueness the source actually had (null counts as one value);
+        # repeated IDs with differing content are a data finding, not a cleaning failure.
+        was_unique = profile.row_count > 0 and (
+            col_prof.distinct_count + (1 if col_prof.null_count else 0) >= profile.row_count
+        )
+        if is_identifier and was_unique and col_prof.name not in dropped_columns:
             cases.append(
                 TestCase(
                     name=f"profile_unique_{col_prof.name}",

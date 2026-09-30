@@ -107,7 +107,7 @@ async def _async_ingest_dataset(task_self: Any, dataset_id: str, job_id: str) ->
         ingested_key = getattr(ingest_result, "ingested_object_key", None)
         if ingested_key:
             dataset.ingested_object_key = ingested_key
-        dataset.status = "profiled"
+        # Stays "profiling": the profile + rules tasks chained below flip it to "profiled".
         dataset.ingested_at = datetime.now(timezone.utc)
 
         await update_job(

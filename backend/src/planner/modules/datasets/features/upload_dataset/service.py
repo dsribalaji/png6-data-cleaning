@@ -196,6 +196,7 @@ async def upload_dataset_service(
         await dispatch_task(
             "planner.modules.datasets.tasks.ingest_dataset",
             kwargs={"dataset_id": str(dataset_id), "job_id": str(job.id)},
+            wait=False,  # ingest + profile can take a while; the row updates live
         )
     except Exception as exc:
         logger.warning("Could not enqueue Celery ingest task: %s", exc)

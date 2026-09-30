@@ -85,6 +85,9 @@ const API_ORIGIN =
 export const api = ky.create({
   prefixUrl: `${API_ORIGIN}/api/v1`,
   retry: 0,
+  // ky's default is 10 s. Upload (ingest + profile), approve (execute + validate) and
+  // exports run inline in local mode and take tens of seconds on large files.
+  timeout: 10 * 60 * 1000,
   hooks: {
     beforeRequest: [
       (request) => {
