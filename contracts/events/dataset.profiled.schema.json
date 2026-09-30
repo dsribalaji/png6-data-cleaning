@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "datasetId": {
+      "format": "uuid",
+      "title": "Datasetid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "datasetId"
+  ],
+  "title": "dataset.profiled",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/dataset.profiled.schema.json"
+}

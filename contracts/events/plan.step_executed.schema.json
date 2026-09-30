@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "planId": {
+      "format": "uuid",
+      "title": "Planid",
+      "type": "string"
+    },
+    "stepId": {
+      "format": "uuid",
+      "title": "Stepid",
+      "type": "string"
+    },
+    "stepNo": {
+      "title": "Stepno",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "planId",
+    "stepId",
+    "stepNo"
+  ],
+  "title": "plan.step_executed",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/plan.step_executed.schema.json"
+}

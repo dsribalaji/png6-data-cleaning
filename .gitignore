@@ -16,11 +16,18 @@ dist/
 # Env / secrets — never commit real values; .env.example carries placeholders only
 .env
 .env.*
+!.env.example
 
 # OS / editor
 .DS_Store
 *.log
 .idea/
 .vscode/
+
+# Local demo artefacts (never commit)
+*.db
+*.db-journal
+backend/storage/
+frontend/tsconfig.tsbuildinfo
 
 # NOTE: keep Alembic migration files tracked (do NOT ignore backend/alembic/versions/).

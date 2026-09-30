@@ -1,19 +1,14 @@
-# Multi-stage Dockerfile for PNG6 frontend
-# Built artifact served statically via nginx
+# Frontend dev server (Slice 1). Serves the Vite dev server with hot reload on
+# port 5173 so the browser can reach it and the dev proxy can reach the API.
+FROM node:20-slim
 
-# Build stage
-FROM node:20-slim AS build
 WORKDIR /app
 
 COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
 
-# Production stage: serve static build artifacts with nginx
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 5173
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

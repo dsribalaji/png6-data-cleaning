@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "planId": {
+      "format": "uuid",
+      "title": "Planid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "planId"
+  ],
+  "title": "plan.approved",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/plan.approved.schema.json"
+}

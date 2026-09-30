@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "jobId": {
+      "format": "uuid",
+      "title": "Jobid",
+      "type": "string"
+    },
+    "errorCode": {
+      "title": "Errorcode",
+      "type": "string"
+    },
+    "errorMessage": {
+      "title": "Errormessage",
+      "type": "string"
+    }
+  },
+  "required": [
+    "jobId",
+    "errorCode",
+    "errorMessage"
+  ],
+  "title": "job.failed",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/job.failed.schema.json"
+}

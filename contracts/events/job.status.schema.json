@@ -1,0 +1,51 @@
+{
+  "description": "SSE job.status message: { jobId, type, status, progressPct, message, planId? }.",
+  "properties": {
+    "jobId": {
+      "format": "uuid",
+      "title": "Jobid",
+      "type": "string"
+    },
+    "type": {
+      "title": "Type",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "progressPct": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Progresspct",
+      "type": "number"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "planId": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Planid"
+    }
+  },
+  "required": [
+    "jobId",
+    "type",
+    "status",
+    "progressPct",
+    "message"
+  ],
+  "title": "job.status",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/job.status.schema.json"
+}

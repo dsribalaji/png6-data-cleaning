@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "evaluationId": {
+      "format": "uuid",
+      "title": "Evaluationid",
+      "type": "string"
+    },
+    "passRate": {
+      "title": "Passrate",
+      "type": "number"
+    }
+  },
+  "required": [
+    "evaluationId",
+    "passRate"
+  ],
+  "title": "evaluation.completed",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/evaluation.completed.schema.json"
+}

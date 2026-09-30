@@ -34,14 +34,30 @@ One Docker image (a packaged, runnable snapshot of the app and its dependencies)
 
 ## Where code lives
 
-Per the canonical layout in `DESIGN_CONTRACT.md` §3:
+Per the canonical layout in `DESIGN_CONTRACT.md` §3 (Backend.md + Frontend_PRD.md
+are the build authority since 2026-09-30; the 9-slice brief is superseded —
+this section was updated to match; the contract wins on any conflict):
 
-- `backend/` — the Python service: `app/main.py` (entry point), `app/api/` (HTTP routers: datasets, profile, plans, execute, tests, audit, auth), `app/core/` (configuration, JWT security, SSE events), `app/models/` (SQLAlchemy 2 database models), `app/schemas/` (Pydantic v2 request/response schemas), `app/services/` (profiler, planner, loss_estimator, executor, tester, rollback, quarantine), `app/workers/` (Celery tasks), `alembic/` (database migrations), `tests/`.
-- `frontend/` — the React app: `src/pages/` holds the nine screens (Datasets, Profile, PlanReview, Execute, Tests, Quarantine, Audit, ModelSettings, DatasetDetail), `src/api/` holds the TanStack Query hooks and generated OpenAPI types.
-- `data/reference/` — the untouched reference dataset (`VendorInvoices_uncleaned.xlsx`).
-- `docs/architecture/` — the brief-mode architecture handoff (`manifest.yaml`, `brief-handoff.md`).
+- `backend/` — `CLAUDE.md` (copy of Backend.md), `src/planner/` (the Python
+  service: `main.py`, `worker.py`, `core/`, `modules/`, `engine/`, `llm/`),
+  `migrations/` (Alembic), `tests/` (unit, integration, api, fixtures).
+  Modules: users, datasets, profiling, planning, execution, validation,
+  model_config, audit, evaluation. Each module exposes only `public.py` to
+  other modules (import-linter); `llm/gateway.py` is the only file importing
+  litellm.
+- `frontend/` — `CLAUDE.md` (copy of Frontend_PRD.md), feature-sliced SPA
+  (`src/app`, `src/api`, `src/auth`, `src/features`, `src/shared`), `e2e/`
+  (Playwright).
+- `contracts/events/` — JSON schemas generated from `core/events.py`.
+- `deploy/docker-compose.yml` — postgres, redis, rabbitmq, minio, api, worker,
+  beat, frontend, prometheus, grafana.
+- `data/reference/` — the untouched reference dataset
+  (`VendorInvoices_uncleaned.xlsx`).
+- `docs/` — FRS, diagrams, ADRs.
 
-Do not invent alternative directories; the contract forbids it.
+API conventions: base `/api/v1`, camelCase JSON, problem+json errors, OpenAPI at
+`/api/docs`, SSE at `GET /api/v1/datasets/{id}/events`. Do not invent
+alternative directories; the contract forbids it.
 
 ## Conventions
 

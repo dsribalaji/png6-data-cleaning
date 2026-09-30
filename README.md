@@ -2,6 +2,45 @@
 
 Agentic Data Cleaning Planner — Team TITAN (NCS26GA-46), CodeStorm 2K26, problem statement PNG6 (track: Generative AI & LLM Applications). Tonight's 9:30 PM IST target is the Level-2 evaluation: a working minimum viable product (MVP — the smallest version that actually works) of the deterministic core flow.
 
+## Quick Start (Laptop Demo Mode)
+
+**Prerequisites:** Python 3.12+, Node 24+, a Groq API key (free at console.groq.com)
+
+```bash
+# 1. Clone and enter
+git clone https://github.com/dsribalaji/png6-data-cleaning.git
+cd png6-data-cleaning
+
+# 2. Backend setup
+cd backend
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Configure (copy and edit)
+cp .env.example .env
+# Set in .env:
+#   DATABASE_URL=sqlite+aiosqlite:///./planner.db
+#   GROQ_API_KEY=your_key_here
+#   CELERY_TASK_ALWAYS_EAGER=true
+#   STORAGE_BACKEND=local
+
+# 4. Run migrations and seed demo user
+alembic upgrade head
+python scripts/seed_demo.py
+# Demo login: admin@example.com / Admin123!
+
+# 5. Start backend (terminal 1)
+uvicorn planner.main:app --host 127.0.0.1 --port 8000
+
+# 6. Frontend setup (terminal 2)
+cd ../frontend
+npm install
+npm run dev
+# Open http://localhost:5173
+```
+
+See [docs/LOCAL_SHOWCASE.md](docs/LOCAL_SHOWCASE.md) for the complete showcase walkthrough with the golden workbook (22 rows, 313 line items, 154,292 total).
+
 An **agentic data cleaning planner** is software that takes a messy tabular dataset (rows and columns, e.g. from a spreadsheet), automatically studies its quality problems, works out the rules that would clean it, proposes a cleaning plan for a human to review, estimates how much information each step would destroy, then runs the approved plan, checks its own work with generated tests, and can undo everything it did.
 
 The problem statement's story: an invoice-extraction pipeline already reads invoice emails, parses PDFs, and writes one spreadsheet row per invoice — but that output is noisy (mixed date formats, variant supplier spellings, amounts stored as text with `$` signs, line items buried in JSON text cells, missing dates and PO numbers). Today a person cleans that by hand with no record of changes, no undo, and no validation. This planner replaces that manual work with a reversible, test-driven, loss-estimated pipeline.

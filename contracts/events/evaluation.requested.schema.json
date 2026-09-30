@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "benchmarkSetId": {
+      "format": "uuid",
+      "title": "Benchmarksetid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "benchmarkSetId"
+  ],
+  "title": "evaluation.requested",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/evaluation.requested.schema.json"
+}

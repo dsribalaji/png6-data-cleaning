@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "planId": {
+      "format": "uuid",
+      "title": "Planid",
+      "type": "string"
+    },
+    "versionNo": {
+      "title": "Versionno",
+      "type": "integer"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "planId",
+    "versionNo",
+    "passed"
+  ],
+  "title": "validation.completed",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/validation.completed.schema.json"
+}

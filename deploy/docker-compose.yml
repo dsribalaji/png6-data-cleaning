@@ -1,0 +1,142 @@
+# deploy/docker-compose.yml - png6-data-cleaning MVP local infrastructure (Backend.md).
+#
+# Services: postgres:16, redis:7, rabbitmq:3.13-management, minio,
+# api, worker, beat (one backend image), frontend, prometheus, grafana.
+#
+# Quickstart:
+#   cp .env.example .env   (from the repo root)
+#   make build && make up
+#
+# NOTE: Prometheus/Grafana ship with default configs here; the API scrape
+# target and dashboards land with /metrics and the observability slice.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-planner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-planner}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-planner} -d $${POSTGRES_DB:-planner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme-minio}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniadata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ../backend
+    env_file:
+      - ../.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker:
+    build: ../backend
+    env_file:
+      - ../.env
+    # Backend.md queue list plus the default queue (outbox relay is beat-scheduled).
+    command: celery -A planner.worker.celery_app worker -Q ingest,profile,plan,execute,validate,eval,celery -l info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  beat:
+    build: ../backend
+    env_file:
+      - ../.env
+    command: celery -A planner.worker.celery_app beat -l info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    build: ../frontend
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitdata:
+  miniadata:

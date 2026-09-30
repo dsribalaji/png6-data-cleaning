@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "planId": {
+      "format": "uuid",
+      "title": "Planid",
+      "type": "string"
+    },
+    "fromVersionNo": {
+      "title": "Fromversionno",
+      "type": "integer"
+    },
+    "toVersionNo": {
+      "title": "Toversionno",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "planId",
+    "fromVersionNo",
+    "toVersionNo"
+  ],
+  "title": "rollback.requested",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/rollback.requested.schema.json"
+}

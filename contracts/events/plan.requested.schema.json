@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "datasetId": {
+      "format": "uuid",
+      "title": "Datasetid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "datasetId"
+  ],
+  "title": "plan.requested",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/plan.requested.schema.json"
+}

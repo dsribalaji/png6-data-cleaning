@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "datasetId": {
+      "format": "uuid",
+      "title": "Datasetid",
+      "type": "string"
+    },
+    "ruleCount": {
+      "title": "Rulecount",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "datasetId",
+    "ruleCount"
+  ],
+  "title": "rules.inferred",
+  "type": "object",
+  "$id": "https://png6.local/contracts/events/rules.inferred.schema.json"
+}

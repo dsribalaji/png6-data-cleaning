@@ -1,42 +1,66 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "png6-data-cleaning"
+name = "planner"
 version = "0.1.0"
-description = "Agentic Data Cleaning Planner MVP backend"
-readme = "README.md"
-requires-python = ">=3.12,<3.13"
+description = "Agentic Data Cleaning Planner (PNG6) - backend"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]",
+    "gunicorn",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
-    "psycopg2-binary",
-    "celery[redis,rabbitmq]",
+    "asyncpg",
+    "aiosqlite",
+    "python-multipart>=0.0.9",
+    "celery>=5.4",
     "redis",
-    "minio",
-    "polars",
-    "duckdb",
-    "pyarrow",
-    "litellm",
-    "pyjwt",
-    "argon2-cffi",
-    "python-multipart",
-    "openpyxl",
     "sse-starlette",
-    "httpx",
+    "boto3",
+    "polars",
+    "pyarrow",
+    "duckdb",
+    "fastexcel",
+    "openpyxl",
+    "rapidfuzz",
+    "python-dateutil",
+    "litellm",
+    "instructor",
+    "pyjwt",
+    "pwdlib[argon2]",
+    "cryptography",
+    "slowapi",
+    "structlog",
+    "opentelemetry-sdk",
+    "prometheus-client",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-asyncio",
+    "httpx",
+    "testcontainers",
+    "hypothesis",
+    "schemathesis",
+    "factory-boy",
+    "ruff",
+    "mypy",
+    "import-linter",
+    "pre-commit",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/planner"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100

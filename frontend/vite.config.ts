@@ -1,19 +1,25 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Note: Backend FastAPI currently has no global "/api" prefix; routes are mounted at root
-// (e.g. /datasets, /profile, /plans). This proxy for "/api" is kept as PROVISIONAL
-// if the backend is later mounted behind an /api prefix or gateway.
+const proxyTarget = process.env.VITE_PROXY_TARGET || "http://localhost:8000";
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: proxyTarget,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
+  },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["src/test/setup.ts"],
+    // Playwright specs live under e2e/ and must never be collected by vitest.
+    exclude: ["e2e/**", "node_modules/**", "dist/**"],
   },
 });
