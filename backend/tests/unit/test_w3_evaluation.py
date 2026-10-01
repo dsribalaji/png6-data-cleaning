@@ -30,7 +30,6 @@ from planner.modules.evaluation.features.list_evaluations.schemas import ListEva
 from planner.modules.evaluation.features.list_evaluations.service import list_evaluations
 from planner.modules.evaluation.models import BenchmarkSet, EvaluationRun
 from planner.modules.evaluation.public import ensure_default_benchmark_set, get_run
-from planner.core.outbox import OutboxEvent
 from planner.modules.evaluation.tasks import _run_evaluation_async
 
 

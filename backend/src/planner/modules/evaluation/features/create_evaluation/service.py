@@ -15,7 +15,6 @@ from planner.modules.evaluation.features.create_evaluation.schemas import (
     CreateEvaluationOut,
 )
 from planner.modules.evaluation.models import BenchmarkSet, EvaluationRun
-from planner.modules.evaluation.public import ensure_default_benchmark_set
 
 
 async def create_evaluation(
@@ -50,6 +49,9 @@ async def create_evaluation(
             await session.flush()
         benchmark_set_id = bset.id
     else:
+        # Lazy: public.py imports this feature's router (circular at module load).
+        from planner.modules.evaluation.public import ensure_default_benchmark_set
+
         bset = await ensure_default_benchmark_set(session)
         benchmark_set_id = bset.id
 
