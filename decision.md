@@ -2,6 +2,41 @@
 
 Newest first. Each entry: date, decider, decision, rationale, status (active / superseded / proposed).
 
+## 2026-10-01 — Deployment hardening ported from antix into the repo (SB: "proceed with other 2, deploy the engineering team")
+
+**Decision:** Port the non-secret hardening work done live on antix back into the repo:
+Caddy TLS-termination overlay (`deploy/caddy/Caddyfile`, `deploy/docker-compose.hardening.yml`),
+per-host key generator (`deploy/gen-local-tls.sh`), the encryption-at-rest audit
+(`deploy/ENCRYPTION_AT_REST.md`), `.gitignore` for `deploy/pg-tls/`, and the app-source
+change in `backend/src/planner/core/db.py` (`_pg_ssl_context()`, env-gated by
+`PGSSLMODE=require` — asyncpg takes an `ssl.SSLContext` via `connect_args`, NOT an
+`sslmode` URL kwarg, which raises `TypeError`; that failed experiment was reverted on
+antix). Key material (`server.key`, `MINIO_KMS_SECRET_KEY`, Caddy CA) stays per-host and
+is NOT committed.
+
+**Verified:** all three hardening checks GREEN on the antix stack (TLS via Caddy with
+chain validation + HSTS; encryption audit complete with residual risks honestly recorded;
+live exit gate passed end to end incl. byte-identical rollback). Port re-verified here:
+`ruff check` → all passed, `pytest` → 283/283. One stale comment fixed in the port
+(`:8443` → real 443 mapping). Base `deploy/docker-compose.yml` untouched.
+
+**Status:** active. Committed locally; NOT pushed (push needs SB's word).
+
+## 2026-10-01 — Ruff ratchet closed: 400 → 0 findings, backend suite 283/283 (SB: "proceed with other 2, deploy the engineering team")
+
+**Decision:** Close the lint debt properly instead of narrowing the ruff config. Safe
+rules auto-fixed (`--fix`); B008's 97 hits were 96× the standard FastAPI DI idiom
+(`Depends`/`Query`/`File` in defaults) → documented `per-file-ignores` in
+`backend/pyproject.toml`, plus 1 genuine mutable default hoisted to a module singleton
+(behavior-identical). BLE001 narrowed or logged with reasoned `# noqa` at true
+resilience boundaries; S110/S112 now log instead of swallowing.
+
+**Verified (coordinator re-ran):** `ruff check` → all passed; `pytest` → 283 passed,
+5 warnings. Correction to the old record: the pre-change tree also collects 283 tests —
+the "178" baseline cited earlier was stale, not a regression.
+
+**Status:** active. Committed locally as `ba40a81`; NOT pushed (push needs SB's word).
+
 ## 2026-10-01 — Approved UI integrated into the live React frontend (SB approved design, then "integrate to live frontend without breaking anything")
 
 **Decision:** Applied the SB-approved UI design (indigo #4F46E5 system, 220ms Motion

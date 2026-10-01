@@ -1,0 +1,17 @@
+# Caddy: local TLS termination for the PNG6 stack (antix, local-only).
+# Serves https://localhost with a self-signed LOCAL CA (tls internal).
+#   /api/* -> api:8000, everything else -> frontend:5173 (vite preview).
+# The CA root cert is generated on first run at /data/caddy/pki/authorities/local/root.crt
+# (volume caddy_data). Trust it explicitly with curl --cacert; never use -k.
+# Real public deployment: replace [tls internal] with a public hostname + ACME,
+#   e.g. [tls admin@example.com], and point DNS at the host. Keep the HSTS header.
+https://localhost {
+	tls internal
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy frontend:5173
+	}
+}

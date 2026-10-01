@@ -1,0 +1,77 @@
+# deploy/docker-compose.hardening.yml - local hardening overlay (antix, local-only).
+# The base deploy/docker-compose.yml is NOT modified; this file only ADDS.
+#
+# Contents:
+#   caddy    - TLS-terminating reverse proxy (self-signed local CA via "tls internal").
+#              https://localhost -> /api/* to api:8000, / to frontend:5173.
+#              CA root cert (generated on first run) at caddy_data:/data/caddy/pki/authorities/local/root.crt
+#   postgres - server-side TLS enabled (ssl=on, not forced). Capable clients
+#              (sslmode=prefer) transparently upgrade; plaintext still accepted.
+#   minio    - SSE-S3 at rest via built-in secret-key KMS (MINIO_KMS_SECRET_KEY in .env).
+#   rabbitmq - relaxed healthcheck timeout (diagnostics ping flakes on this host).
+#   api/worker/beat - PGSSLMODE=require: app uses TLS for postgres (db.py).
+#
+# First-time setup on a host (generates throwaway local-only key material):
+#   ./deploy/gen-local-tls.sh
+# Usage:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.hardening.yml up -d
+#
+# Real public deployment: give Caddy a public hostname + ACME email instead of
+# "tls internal", point DNS at the host, and manage real secrets (OpenBao profile
+# or a secret manager) instead of .env. Keep the HSTS header.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+
+  postgres:
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/etc/pg-tls/server.crt", "-c", "ssl_key_file=/etc/pg-tls/server.key"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./pg-tls:/etc/pg-tls:ro
+
+  minio:
+    # Reads MINIO_KMS_SECRET_KEY from the repo-root .env (same pattern as api/worker/beat).
+    # (Compose interpolation would read deploy/.env, which does not exist, so env_file is used.)
+    env_file:
+      - ../.env
+
+  rabbitmq:
+    # rabbitmq-diagnostics ping intermittently exceeds the base 5s timeout on this
+    # host (the broker itself serves AMQP fine); relax it so compose dependency
+    # gates do not flap.
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
+
+  api:
+    # Ask the app to use TLS for postgres connections (see _pg_ssl_context in
+    # backend/src/planner/core/db.py). Server still accepts plaintext for tools
+    # that do not set this (e.g. alembic at container start).
+    environment:
+      PGSSLMODE: require
+
+  worker:
+    environment:
+      PGSSLMODE: require
+
+  beat:
+    environment:
+      PGSSLMODE: require
+
+volumes:
+  caddy_data:
+  caddy_config:

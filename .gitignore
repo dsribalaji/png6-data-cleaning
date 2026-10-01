@@ -36,3 +36,6 @@ schemathesis-report/
 frontend/tsconfig.tsbuildinfo
 
 # NOTE: keep Alembic migration files tracked (do NOT ignore backend/alembic/versions/).
+
+# Local hardening key material (throwaway, per-host; see deploy/gen-local-tls.sh)
+deploy/pg-tls/
