@@ -246,6 +246,23 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
 | Every release through the pipeline, no manual deploys | **Partly met.** CI builds, scans and publishes the image; the demo is started by hand on the presenter's machine |
 | HTTPS / TLS | **Met for the demo** via the Cloudflare tunnel; encryption at rest not done |
 
+## 4g. M4–M6 progress (2026-10-01)
+
+- **D-7 done** (PR #2): 20 sign-ins and 10 uploads per client per minute, then 429 `RATE_LIMITED`. This sits alongside the existing 5-failure / 15-minute account lockout. `tests/unit/test_rate_limit.py`.
+- **D-1 done** (PR #2): `docs/architecture/threat-model.md`, a STRIDE table for the upload, LLM, export and sign-in paths, with an accepted-risks list.
+- **D-4 done** (PR #2): OpenBao secret loading (`core/secrets.py`). It is opt-in via `BAO_ADDR`, accepts http/https only, and fails closed. There is an `openbao` dev service under the `secrets` profile. `tests/unit/test_openbao_secrets.py`.
+- **D-2 done** (PR #3): Keycloak SSO with required TOTP MFA as `AUTH_MODE=oidc`.
+  - Backend: RS256 tokens are verified against the realm JWKS; roles are mapped; password sign-in is refused; users are provisioned on first sign-in.
+  - Realm import: a PKCE client and the four roles.
+  - Frontend: the PKCE flow.
+  - CI job `sso` runs `backend/scripts/sso_smoke.py`. Unit tests: `tests/unit/test_oidc_verifier.py`, `src/auth/oidc.test.ts`.
+- **M5 written** (PR #4):
+  - Caddy HTTPS proxy and production compose override.
+  - `deploy/remote-deploy.sh` with a smoke test and automatic rollback.
+  - CI `deploy` job, gated on `vars.DEPLOY_HOST`.
+  - Runbook and encryption at rest in `docs/DEPLOYMENT.md`.
+  - The compose files and script syntax are validated in CI. **The deploy has not run, because no VM exists yet.**
+
 ## 5. Order
 
 Each milestone ends with a tested, working state. The pipeline goes first so that everything after it ships through CI.
@@ -260,14 +277,16 @@ Each milestone ends with a tested, working state. The pipeline goes first so tha
 
 ## 6. Exit-gate evidence
 
-| Gate line | Evidence |
-|---|---|
-| Users sign in with SSO and MFA | A Playwright spec against the public URL: Keycloak login + TOTP; a screenshot in the exit-gate report |
-| Roles enforced on every API | The route-coverage test (D-3) + `test_auth_required.py` + a role-matrix test (each role × each route) |
-| Evaluation benchmark passes | The scorer output over the labelled set meets the pass bar (D5); LLM-off in CI plus one recorded LLM-on run |
-| Bad input is quarantined, never crashes a job | The benchmark crash count is 0; the quarantine precision and recall |
-| Every release goes through the pipeline, no manual deploys | GitHub Actions history: each deployed SHA has a green pipeline run; the deploy log on the host |
-| HTTPS, TLS, encryption at rest (roadmap build line) | The SSL Labs report; host disk-encryption check |
+Status on 2026-10-01. "Verified in CI" means a GitHub Actions job asserts it on every push.
+
+| Gate line | Status | Evidence |
+|---|---|---|
+| Users sign in with SSO and MFA | **Built; verified in CI except the QR-code step** | CI job `sso` ([run](https://github.com/dsribalaji/png6-data-cleaning/actions/runs/36818605985)): Keycloak-issued tokens accepted, roles mapped, password sign-in refused (403 `SSO_REQUIRED`), tampered token rejected, demo user gets no token before setting up MFA. Enrolling an authenticator app is the manual demo in `docs/DEPLOYMENT.md` |
+| Roles enforced on every API | **Met, verified in CI** | `tests/api/test_route_auth_coverage.py` (all routes), `tests/api/test_auth_required.py`, `sso_smoke.py` (viewer gets 403) |
+| Evaluation benchmark passes | **Met, verified in CI** | `scripts/evaluate_benchmark.py` pass bar in the backend job (19 labelled cases: 0 crashes, quarantine recall and precision 1.0, injection flag rate 1.0, rule recall 1.0) |
+| Bad input is quarantined, never crashes a job | **Met, verified in CI** | Same benchmark (crash count 0) + API fuzzing in e2e (no 5xx) |
+| Every release goes through the pipeline, no manual deploys | **Pipeline ready; waiting for a VM** | Required checks on `main` (backend, frontend, security, e2e, image); `deploy` job + `deploy/remote-deploy.sh` (smoke test, rollback). It runs once `DEPLOY_HOST`, `DEPLOY_USER` and `DEPLOY_SSH_KEY` are set |
+| HTTPS / TLS, encryption at rest | **HTTPS live for the demo; VM setup documented** | Demo: Cloudflare tunnel (`make demo`). VM: Caddy + Let's Encrypt (`deploy/Caddyfile`); encrypted disk + MinIO SSE in `docs/DEPLOYMENT.md` |
 
 ## 7. Out of scope (Level 4 or later)
 

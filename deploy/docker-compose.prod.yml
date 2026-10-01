@@ -1,0 +1,52 @@
+# Production override for the cloud VM (Level 3 M5). Used by deploy/remote-deploy.sh:
+#   IMAGE_TAG=<git sha> DOMAIN=planner.example.com docker compose \
+#     -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml --profile prod up -d
+# - api/worker/beat run the CI-built, trivy-scanned image from GHCR (no build on the VM);
+# - only Caddy publishes ports (80/443); databases, queues and storage stay internal;
+# - the web app is built on the VM from the same commit (it bakes in VITE_* settings).
+services:
+  postgres:
+    ports: !reset []
+  redis:
+    ports: !reset []
+  rabbitmq:
+    ports: !reset []
+  minio:
+    ports: !reset []
+  api:
+    image: ghcr.io/dsribalaji/png6-planner:${IMAGE_TAG:?set IMAGE_TAG to the commit to deploy}
+    build: !reset null
+    ports: !reset []
+    restart: unless-stopped
+  worker:
+    image: ghcr.io/dsribalaji/png6-planner:${IMAGE_TAG:?set IMAGE_TAG}
+    build: !reset null
+    restart: unless-stopped
+  beat:
+    image: ghcr.io/dsribalaji/png6-planner:${IMAGE_TAG:?set IMAGE_TAG}
+    build: !reset null
+    restart: unless-stopped
+  frontend:
+    ports: !reset []
+    restart: unless-stopped
+  prometheus:
+    profiles: ["monitoring"]
+  grafana:
+    profiles: ["monitoring"]
+  proxy:
+    image: caddy:2
+    profiles: ["prod"]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to the public host name}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - frontend
+
+volumes:
+  caddy_data:
