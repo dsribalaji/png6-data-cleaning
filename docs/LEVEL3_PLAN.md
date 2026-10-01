@@ -193,6 +193,22 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
   removed and `main.py` restored byte-identical.
 - **Current result:** 39 operations, 1164 generated cases, **0 crashes / 0 server errors**,
   run completes (`stop_reason: completed`, not an early stop). Backend suite: 231 passed.
+- **The first CI run found two more 500s that the local run did not**, which is the point of
+  running it against the real stack: SQLite is more permissive than the Postgres Compose
+  actually runs. Both were client input errors and now answer 4xx:
+  - `POST /api/v1/datasets/{id}/plans` with an out-of-range `lossThreshold` overflowed the
+    `numeric` column at commit and returned 500. The threshold is a fraction, so it is now
+    bounded to 0..1 and rejected with a 422 during validation.
+  - `POST /api/v1/evaluations` with a `modelConfigId` that does not exist violated the foreign
+    key at commit and returned 500. The id is now checked through the `model_config` public
+    surface first and answers the existing 404 `MODEL_CONFIG_NOT_FOUND`.
+  - Regression tests cover both (`test_w3_plan_threshold.py`, and the unknown-id case in
+    `test_w3_evaluation.py`). Suite after the fixes: 242 passed.
+- **Unblocked a pre-existing red `main`:** the `security` job was already failing before this
+  work — the evaluation corpus carried a literal U+202E right-to-left override, which bandit
+  reports as B613 `trojansource`. It is now written as an escape: identical bytes, the
+  adversarial fixture still tests what it claims to, and the literal no longer visually
+  reverses the line for anyone reading the file. Bandit is clean (0 medium, 0 high).
 - **Known and deliberately not fatal yet:** ~99 non-5xx findings, all OpenAPI *documentation*
   debt rather than runtime bugs — the app returns every error as `application/problem+json`
   and returns 401/403/404/409 responses the generated spec does not list, and

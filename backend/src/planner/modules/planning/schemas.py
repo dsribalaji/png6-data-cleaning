@@ -60,7 +60,16 @@ class PlanOut(CamelModel):
 
 
 class CreatePlanRequest(CamelModel):
-    loss_threshold: float = 0.05
+    """Body for creating a plan.
+
+    ``loss_threshold`` is the fraction of cells a step may destroy before it
+    needs a human decision (Backend.md, default 0.05 = 5%). It is a ratio, so it
+    is bounded to 0..1. Without that bound a huge value reached the database as
+    a numeric overflow and the request failed with a 500; it is a client input
+    error, so it is now a 422 from validation.
+    """
+
+    loss_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
 
 
 class DecideStepRequest(CamelModel):

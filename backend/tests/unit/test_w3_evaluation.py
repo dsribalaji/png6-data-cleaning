@@ -339,3 +339,30 @@ async def test_tasks__run_evaluation__failed_run__records_failure_and_reraises(
         assert refreshed_run.status == "failed"
         assert "Simulated task error" in str(refreshed_run.error_message)
         assert refreshed_run.finished_at is not None
+
+
+async def test_create_evaluation__unknown_model_config_id__404_not_500(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unknown modelConfigId answers 404, not a foreign-key 500.
+
+    Found by API fuzzing (E3): the id went straight into the insert, and the
+    database rejected it at commit time, so the request failed with a 500.
+    """
+    async def fake_dispatch_task(name: str, **kwargs: object) -> None:
+        return None
+
+    import planner.worker as worker_module
+
+    monkeypatch.setattr(worker_module, "dispatch_task", fake_dispatch_task)
+
+    with pytest.raises(AppError) as exc_info:
+        await create_evaluation(
+            session,
+            CreateEvaluationIn(model_config_id=uuid.uuid4()),
+            actor_id=uuid.uuid4(),
+            actor_role="data_engineer",
+        )
+
+    assert exc_info.value.code == "MODEL_CONFIG_NOT_FOUND"
+    assert exc_info.value.status == 404

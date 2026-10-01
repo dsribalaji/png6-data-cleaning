@@ -20,6 +20,19 @@ async def get_active_model_config(session: AsyncSession) -> ModelConfig | None:
     return result.scalar_one_or_none()
 
 
+async def get_model_config(session: AsyncSession, config_id: object) -> ModelConfig | None:
+    """Retrieve one model configuration by id, or None if it does not exist.
+
+    Lets other modules validate a caller-supplied model config id instead of
+    letting the database raise a foreign-key violation.
+    """
+    from uuid import UUID
+
+    stmt = select(ModelConfig).where(ModelConfig.id == UUID(str(config_id)))
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def resolve_llm_config(session: AsyncSession) -> ResolvedModelConfig | None:
     """Resolve and decrypt the active model configuration into ResolvedModelConfig."""
     row = await get_active_model_config(session)
@@ -97,6 +110,7 @@ __all__ = [
     "build_llm_gateway",
     "describe_llm_outcome",
     "get_active_model_config",
+    "get_model_config",
     "resolve_active_llm_config",
     "resolve_llm_config",
     "routers",

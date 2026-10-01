@@ -55,6 +55,17 @@ async def create_evaluation(
         bset = await ensure_default_benchmark_set(session)
         benchmark_set_id = bset.id
 
+    if input.model_config_id is not None:
+        # Validate before insert: an unknown id otherwise violates the foreign
+        # key at commit time, which surfaces as a 500. It is a client input
+        # error, so it answers 404 MODEL_CONFIG_NOT_FOUND like the other
+        # not-found cases in this module.
+        from planner.modules.model_config.public import get_model_config
+        from planner.modules.model_config.errors import MODEL_CONFIG_NOT_FOUND
+
+        if await get_model_config(session, input.model_config_id) is None:
+            raise MODEL_CONFIG_NOT_FOUND
+
     run = EvaluationRun(
         benchmark_set_id=benchmark_set_id,
         model_config_id=input.model_config_id,
