@@ -21,6 +21,7 @@ from planner.core.ports.llm import LlmGatewayPort
 from planner.engine.guards.scanner import mask_sample, scan_prompt_injection
 from planner.engine.ingest.parquet import read_parquet
 from planner.engine.loss.estimator import cumulative_loss, estimate_step_loss
+from planner.engine.nested import summarise
 from planner.engine.ops.base import OPS, LossEstimate
 from planner.modules.planning.models import LossEstimateRow, Plan, PlanStep
 from planner.worker import celery_app
@@ -45,6 +46,25 @@ def _llm_gateway() -> LlmGatewayPort:
     from planner.modules.model_config.public import build_llm_gateway
 
     return build_llm_gateway()
+
+
+def _expand_rationale(cells: list[Any], column: str, child: str, key: str | None) -> str:
+    """Say what expanding will recover and lose, cell by cell (engine/nested.py)."""
+    c = summarise(cells)
+    text = (
+        f"Expand the nested records in '{column}' into a new table '{child}' "
+        f"({c['items']:,} rows, linked by '{key}')."
+    )
+    if c["repaired"]:
+        text += f" {c['repaired']:,} cells were not strict JSON (single quotes) and were repaired."
+    if c["partial"]:
+        text += (
+            f" {c['partial']:,} cells were cut off: their complete items are kept, the cut-off"
+            " item is lost."
+        )
+    if c["invalid"]:
+        text += f" {c['invalid']:,} cells could not be read at all and are lost."
+    return text
 
 
 def merge_steps(
@@ -379,7 +399,7 @@ def build_steps_from_rules(
                 StepCandidate(
                     operation="expand_nested",
                     parameters={"column": c_name, "key_column": pk_col, "child_table": child_tbl},
-                    rationale=f"Expand nested JSON in '{c_name}' into child table '{child_tbl}' with key '{pk_col}'",
+                    rationale=_expand_rationale(df[c_name].to_list(), c_name, child_tbl, pk_col),
                     confidence=float(getattr(r, "confidence", 0.95)),
                 )
             )

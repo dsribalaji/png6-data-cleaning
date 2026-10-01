@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import dateutil.parser
 import polars as pl
+
+from planner.engine.nested import parse_nested
 
 
 @dataclass
@@ -34,22 +35,11 @@ class TableProfile:
 
 
 def _check_nested_json(values: list[Any]) -> bool:
+    """Nested when at least half the values parse as records (JSON or repairable)."""
     if not values:
         return False
-    parsed_count = 0
-    for v in values:
-        if not isinstance(v, str):
-            continue
-        s = v.strip()
-        if not ((s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]"))):
-            continue
-        try:
-            parsed = json.loads(s)
-            if isinstance(parsed, (dict, list)):
-                parsed_count += 1
-        except Exception:
-            continue
-    return (parsed_count / len(values)) >= 0.5
+    parsed = sum(1 for v in values if parse_nested(v).status in ("ok", "repaired", "partial"))
+    return (parsed / len(values)) >= 0.5
 
 
 def _check_numeric_text(values: list[Any]) -> bool:
