@@ -22,12 +22,15 @@ def load_openbao_secrets(environ: dict[str, str] = os.environ) -> list[str]:  # 
     addr, token = environ.get("BAO_ADDR"), environ.get("BAO_TOKEN")
     if not addr or not token:
         return []
+    if not addr.startswith(("http://", "https://")):
+        raise RuntimeError("BAO_ADDR must be an http:// or https:// URL")
     path = environ.get("BAO_SECRET_PATH", "secret/data/png6").strip("/")
     request = urllib.request.Request(
         f"{addr.rstrip('/')}/v1/{path}", headers={"X-Vault-Token": token}
     )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310 (operator-set URL)
+        # Scheme checked above (http/https only), so no file:// or custom schemes.
+        with urllib.request.urlopen(request, timeout=5) as response:  # nosec B310  # noqa: S310
             body = json.load(response)
     except Exception as exc:
         raise RuntimeError(f"OpenBao is configured (BAO_ADDR) but {path} could not be read: {exc}") from exc

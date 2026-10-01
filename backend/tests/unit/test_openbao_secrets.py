@@ -38,3 +38,8 @@ def test_bao_unreachable__startup_fails_closed(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(secrets.urllib.request, "urlopen", boom)
     with pytest.raises(RuntimeError, match="could not be read"):
         secrets.load_openbao_secrets({"BAO_ADDR": "http://bao:8200", "BAO_TOKEN": "t"})
+
+
+def test_bao_addr_must_be_http() -> None:
+    with pytest.raises(RuntimeError, match="http"):
+        secrets.load_openbao_secrets({"BAO_ADDR": "file:///etc/passwd", "BAO_TOKEN": "t"})
