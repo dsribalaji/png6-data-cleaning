@@ -221,6 +221,12 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository_owner }}/png6-planner
     steps:
       - uses: actions/checkout@v4
+      - name: production compose files are valid (M5)
+        run: |
+          cp .env.example .env
+          IMAGE_TAG=check DOMAIN=example.com docker compose -f deploy/docker-compose.yml \
+            -f deploy/docker-compose.prod.yml --profile prod config -q
+          bash -n deploy/remote-deploy.sh deploy/public-demo.sh
       - run: docker build -t "$IMAGE:${{ github.sha }}" backend
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -232,3 +238,43 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker push "$IMAGE:${{ github.sha }}"
+
+  deploy:
+    # Level 3 E5: every green push to main deploys itself; nobody deploys by hand.
+    # Off until the VM exists: set repository variables DEPLOY_HOST and DEPLOY_USER and
+    # secret DEPLOY_SSH_KEY (docs/DEPLOYMENT.md, "Cloud VM"). deploy/remote-deploy.sh
+    # starts the commit, runs a smoke test and rolls back to the previous commit on failure.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEPLOY_HOST != ''
+    needs: [backend, frontend, security, e2e, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read # the VM pulls the image with this job's token
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      TARGET: ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Trust-on-first-use; pin the VM's host key in DEPLOY_KNOWN_HOSTS to avoid it.
+          if [ -n "${{ secrets.DEPLOY_KNOWN_HOSTS }}" ]; then
+            printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "${{ vars.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          fi
+      - name: log the VM in to GHCR (short-lived job token, sent over stdin)
+        run: |
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | ssh -i ~/.ssh/id_deploy "$TARGET" \
+            "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+      - name: deploy, smoke test, roll back on failure
+        run: |
+          scp -i ~/.ssh/id_deploy deploy/remote-deploy.sh "$TARGET:/tmp/remote-deploy.sh"
+          ssh -i ~/.ssh/id_deploy "$TARGET" "bash /tmp/remote-deploy.sh ${{ github.sha }}"
+

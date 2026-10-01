@@ -1,0 +1,15 @@
+# Level 3 D-5: public HTTPS entry point (compose profile `prod`).
+# Caddy gets and renews a Let's Encrypt certificate for $DOMAIN automatically
+# (DNS A record -> the VM, ports 80/443 open) and forwards everything to the web
+# app, which proxies /api to the API. Nothing else is reachable from outside.
+{$DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy frontend:5173
+}
