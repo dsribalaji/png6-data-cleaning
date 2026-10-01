@@ -190,6 +190,19 @@ async def dispatch_task(
     job = _asyncio.create_task(_asyncio.to_thread(_send))
     _background.add(job)
     job.add_done_callback(_background.discard)
+    # A fire-and-forget dispatch that raises (a typo'd task name, an unreachable
+    # broker) would otherwise vanish: the request already returned 202 and nothing
+    # ever reads the task's exception. Log it so the job's absence is explainable.
+    job.add_done_callback(_log_background_failure)
+
+
+def _log_background_failure(job: Any) -> None:
+    """Surface an exception from a fire-and-forget dispatch_task call."""
+    if job.cancelled():
+        return
+    exc = job.exception()
+    if exc is not None:
+        logger.error("Background task dispatch failed: %s", exc, exc_info=exc)
 
 
 def describe() -> dict[str, Any]:

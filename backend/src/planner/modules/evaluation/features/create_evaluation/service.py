@@ -55,6 +55,17 @@ async def create_evaluation(
         bset = await ensure_default_benchmark_set(session)
         benchmark_set_id = bset.id
 
+    if input.model_config_id is not None:
+        # Validate before insert: an unknown id otherwise violates the foreign
+        # key at commit time, which surfaces as a 500. It is a client input
+        # error, so it answers 404 MODEL_CONFIG_NOT_FOUND like the other
+        # not-found cases in this module.
+        from planner.modules.model_config.public import get_model_config
+        from planner.modules.model_config.errors import MODEL_CONFIG_NOT_FOUND
+
+        if await get_model_config(session, input.model_config_id) is None:
+            raise MODEL_CONFIG_NOT_FOUND
+
     run = EvaluationRun(
         benchmark_set_id=benchmark_set_id,
         model_config_id=input.model_config_id,
@@ -65,10 +76,20 @@ async def create_evaluation(
     await session.commit()
     await session.refresh(run)
 
-    # Import inside the service function to avoid hard import cycles
-    from planner.modules.evaluation import tasks as _tasks
+    # Import inside the service function to avoid hard import cycles.
+    # dispatch_task, not run_evaluation.delay(): in eager mode (CELERY_TASK_ALWAYS_EAGER,
+    # the default) delay() runs the task inline on this event loop, and the task body
+    # calls asyncio.run(), which raises "asyncio.run() cannot be called from a running
+    # event loop" and surfaced as a 500 from POST /api/v1/evaluations. dispatch_task
+    # sends from a worker thread, which is what every other module already uses.
+    from planner.worker import dispatch_task
 
-    _tasks.run_evaluation.delay(str(run.id))
+    await dispatch_task(
+        "evaluation.run_evaluation",
+        kwargs={"run_id": str(run.id)},
+        queue="eval",
+        wait=False,
+    )
 
     # Audit: call record_audit per specification (stub owned by worker W1)
     await record_audit(

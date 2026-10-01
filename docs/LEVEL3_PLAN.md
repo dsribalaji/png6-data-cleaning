@@ -167,8 +167,70 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
   "id/number/code" — was fixed with a shape test rather than another name test.
 - **Scores (model off):** 18 cases, 0 crashes, quarantine recall 1.0, quarantine precision 1.0,
   injection flag rate 1.0, rule recall 1.0. Backend suite 231 tests pass.
-- **Still to do in M3:** B7 (cross-field fill, FR-019), B9 (prompt versioning `*.v2`), E3
-  (schemathesis API fuzzing).
+- **Still to do in M3:** B7 (cross-field fill, FR-019), B9 (prompt versioning `*.v2`).
+
+## 4e. M3b progress (2026-10-01) — E3 API fuzzing
+
+- **E3 done.** `backend/scripts/fuzz_api.py` logs in as the seeded administrator, then runs
+  `schemathesis` against the live `/api/docs/openapi.json` with a real bearer token, so the
+  fuzzer reaches the authenticated routes rather than bouncing off 401s. The e2e job runs it
+  against the Compose stack and uploads `fuzz-report.json` + `fuzz-report.xml` as an artifact.
+  The gate is the E3 line: **any 5xx fails the job.**
+- **Two real 500s found and fixed** (this is the point of the exercise):
+  - `POST /api/v1/evaluations` returned 500 in the default eager mode
+    (`CELERY_TASK_ALWAYS_EAGER=true`): the service called `run_evaluation.delay()`, which runs
+    the task inline on the request's event loop, and the task body calls `asyncio.run()` —
+    "asyncio.run() cannot be called from a running event loop". Every other module already
+    went through `worker.dispatch_task`, which sends from a worker thread; the evaluation
+    module was the one that did not. Fixed in `create_evaluation/service.py`.
+  - A follow-on: the first fix dispatched the wrong task name, so runs stayed `pending`
+    forever instead of failing loudly. Two things came out of it — the task is registered as
+    `evaluation.run_evaluation`, not its module path; and `dispatch_task(wait=False)` now logs
+    a failed background dispatch instead of dropping the exception, so a fire-and-forget job
+    that never starts is explainable.
+- **The fuzzer is proven to fail when it should:** a temporary route that raises was added to
+  `main.py`, the fuzzer reported `ServerError: 1` and the script exited 1; the route was then
+  removed and `main.py` restored byte-identical.
+- **Current result:** 39 operations, 1164 generated cases, **0 crashes / 0 server errors**,
+  run completes (`stop_reason: completed`, not an early stop). Backend suite: 231 passed.
+- **The first CI run found two more 500s that the local run did not**, which is the point of
+  running it against the real stack: SQLite is more permissive than the Postgres Compose
+  actually runs. Both were client input errors and now answer 4xx:
+  - `POST /api/v1/datasets/{id}/plans` with an out-of-range `lossThreshold` overflowed the
+    `numeric` column at commit and returned 500. The threshold is a fraction, so it is now
+    bounded to 0..1 and rejected with a 422 during validation.
+  - `POST /api/v1/evaluations` with a `modelConfigId` that does not exist violated the foreign
+    key at commit and returned 500. The id is now checked through the `model_config` public
+    surface first and answers the existing 404 `MODEL_CONFIG_NOT_FOUND`.
+  - Regression tests cover both (`test_w3_plan_threshold.py`, and the unknown-id case in
+    `test_w3_evaluation.py`). Suite after the fixes: 242 passed.
+- **Unblocked a pre-existing red `main`:** the `security` job was already failing before this
+  work — the evaluation corpus carried a literal U+202E right-to-left override, which bandit
+  reports as B613 `trojansource`. It is now written as an escape: identical bytes, the
+  adversarial fixture still tests what it claims to, and the literal no longer visually
+  reverses the line for anyone reading the file. Bandit is clean (0 medium, 0 high).
+- **Ordering constraint worth knowing:** fuzzing generates thousands of malformed logins, and
+  the auth lockout (5 failed attempts, 15 minutes) then answers 403 to the browser
+  walk-through's real login. Both steps are correct; they simply cannot share an account in
+  that order, so the fuzzer runs **last** in the e2e job. The lockout working is not a bug.
+- **Second CI run:** fuzzing passes against the real stack — 1168 cases, **0 server errors**,
+  `stop_reason: completed`. The `JsonSchemaError` findings from the local run did not appear,
+  confirming they were the SQLite-only timezone artifact.
+- **Known and deliberately not fatal yet:** ~99 non-5xx findings, all OpenAPI *documentation*
+  debt rather than runtime bugs — the app returns every error as `application/problem+json`
+  and returns 401/403/404/409 responses the generated spec does not list, and
+  `response_schema_conformance` reports timestamps without a timezone offset. The offset issue
+  is a **SQLite-only artifact** (SQLite drops tzinfo on read; the Compose stack runs Postgres,
+  which preserves it), so it should not appear in CI. They are reported and archived, not
+  silently dropped: `--fail-on all` turns them into a gate once the spec is updated.
+- **E2 job change:** CI's `.env` copied the `FERNET_KEY=change-me` placeholder, which made
+  `PUT /api/v1/model-config` answer 500 (`CONFIGURATION_ERROR`, a documented and unit-tested
+  response). The e2e job now generates a real Fernet key for the run, as it already did for
+  `JWT_SECRET`.
+
+- **Still open in M3:** B7 (the `cross_field_fill` rule, the `fill_missing` op and the plan
+  step all exist in code, but there is no golden test on the reference file), B9
+  (`infer_rules.v2` / `propose_steps.v2` prompts do not exist).
 
 ## 5. Order
 
