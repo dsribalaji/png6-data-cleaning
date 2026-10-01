@@ -6,12 +6,13 @@ here, not taken from the executed child table), so a lossy step cannot hide itse
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import polars as pl
+
+from planner.engine.nested import parse_nested
 
 _TOL = 0.01  # one cent
 _STRIP = re.compile(r"[\$,\s]")
@@ -37,15 +38,8 @@ def _num(value: Any) -> float | None:
 
 
 def _items(cell: Any) -> list[dict[str, Any]]:
-    if not isinstance(cell, str) or not cell:
-        return []
-    try:
-        val = json.loads(cell)
-    except ValueError:
-        return []
-    if isinstance(val, dict):
-        return [val]
-    return [x for x in val if isinstance(x, dict)] if isinstance(val, list) else []
+    # Same parser as expand_nested, so recovered items reconcile one-for-one.
+    return parse_nested(cell).items
 
 
 def _sum(series: pl.Series) -> float:

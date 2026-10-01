@@ -5,11 +5,12 @@ Pure data logic - no FastAPI/DB imports.
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any, ClassVar
 from dateutil import parser as date_parser
 import polars as pl
+
+from planner.engine.nested import looks_nested, parse_nested
 
 from planner.engine.ops.base import (
     InverseOp,
@@ -141,17 +142,8 @@ class ExpandNestedOperation(Operation):
 
     @staticmethod
     def _parse_cell(cell: Any) -> list[dict[str, Any]]:
-        if not cell or not isinstance(cell, str):
-            return []
-        try:
-            val = json.loads(cell)
-        except Exception:
-            return []
-        if isinstance(val, dict):
-            return [val]
-        if isinstance(val, list):
-            return [x for x in val if isinstance(x, dict)]
-        return []
+        # Shared parser: strict JSON, Python-style literals, salvaged cut-off lists.
+        return parse_nested(cell).items
 
     def apply(self, df: pl.DataFrame, params: dict[str, Any]) -> pl.DataFrame:
         col = params["column"]
@@ -225,7 +217,11 @@ class ExpandNestedOperation(Operation):
         total_cells = df.height * df.width
         cells = df[col].to_list()
         affected = sum(1 for c in cells if c is not None)
-        lost = sum(1 for c in cells if c not in (None, "") and not self._parse_cell(c))
+        # Lost: cells nothing could be recovered from, plus cut-off cells (their last,
+        # incomplete item is gone). Repaired cells (single quotes) lose nothing.
+        lost = sum(
+            1 for c in cells if looks_nested(c) and parse_nested(c).status in ("invalid", "partial")
+        )
         return LossEstimate(
             op=self.name,
             rows_affected=affected,

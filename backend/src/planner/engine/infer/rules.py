@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import itertools
-import json
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
 import polars as pl
+
+from planner.engine.nested import parse_nested
 import rapidfuzz.fuzz
 import rapidfuzz.process
 
@@ -259,18 +260,10 @@ def infer_rules(df: pl.DataFrame, profile: TableProfile) -> list[InferredRule]:
             for cell in df[col.name].drop_nulls().to_list():
                 if not isinstance(cell, str):
                     continue
-                try:
-                    parsed = json.loads(cell)
-                    if isinstance(parsed, list):
-                        total_items += len(parsed)
-                        for item in parsed:
-                            if isinstance(item, dict):
-                                sample_keys_set.update(item.keys())
-                    elif isinstance(parsed, dict):
-                        total_items += 1
-                        sample_keys_set.update(parsed.keys())
-                except Exception:
-                    continue
+                items = parse_nested(cell).items
+                total_items += len(items)
+                for item in items:
+                    sample_keys_set.update(item.keys())
 
             rules.append(
                 InferredRule(
