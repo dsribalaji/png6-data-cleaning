@@ -11,12 +11,15 @@ WORKDIR /app
 # uv for installs (Backend.md); falls back to pip if uv is unavailable.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml ./
-RUN uv pip install --system --no-cache -e . || pip install --no-cache-dir -e .
+# --compile-bytecode: PYTHONDONTWRITEBYTECODE=1 stops runtime .pyc caching, so without
+# precompiled bytecode every process recompiles litellm & co. on import (~70 s cold).
+RUN uv pip install --system --no-cache --compile-bytecode -e . || pip install --no-cache-dir -e .
 
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY alembic.ini ./
 COPY scripts/ ./scripts/
+RUN python -m compileall -q src
 
 EXPOSE 8000
 

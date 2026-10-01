@@ -25,7 +25,7 @@ from planner.core.outbox import emit, register_outbox_handler
 from planner.core.ports.adapters import get_storage
 from planner.core.ports.storage import raw_key
 from planner.modules.datasets.helpers import create_job, update_job
-from planner.modules.datasets.models import Dataset, Job
+from planner.modules.datasets.models import Dataset, Job, QuarantineRecord
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,9 @@ async def _async_ingest_dataset(task_self: Any, dataset_id: str, job_id: str) ->
         ingested_key = getattr(ingest_result, "ingested_object_key", None)
         if ingested_key:
             dataset.ingested_object_key = ingested_key
+        # FR-044: every row the engine quarantined is recorded with its reason.
+        for row_ref, reason in getattr(ingest_result, "quarantine", []):
+            session.add(QuarantineRecord(dataset_id=d_uuid, row_ref=row_ref, reason=reason))
         # Stays "profiling": the profile + rules tasks chained below flip it to "profiled".
         dataset.ingested_at = datetime.now(timezone.utc)
 
@@ -205,9 +208,7 @@ async def _async_poll_n8n_folder() -> int:
 
     polled_count = 0
     candidates = [
-        p
-        for p in folder.iterdir()
-        if p.is_file() and p.suffix.lower() in (".xlsx", ".csv")
+        p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in (".xlsx", ".csv")
     ]
 
     for file_path in candidates:
@@ -256,7 +257,7 @@ async def _async_poll_n8n_folder() -> int:
                 polled_count += 1
 
                 try:
-                    from planner.worker import celery_app
+                    from planner.worker import send_task_eager_aware
 
                     send_task_eager_aware(
                         "planner.modules.datasets.tasks.ingest_dataset",

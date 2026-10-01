@@ -9,6 +9,7 @@ from uuid import UUID
 
 from fastapi import UploadFile
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.audit import record_audit
@@ -30,9 +31,7 @@ logger = logging.getLogger(__name__)
 register_outbox_handler("dataset.uploaded", "planner.modules.datasets.tasks.ingest_dataset")
 
 
-def _precheck_quarantine(
-    file_name: str, data: bytes
-) -> tuple[list[dict[str, str]], bool]:
+def _precheck_quarantine(file_name: str, data: bytes) -> tuple[list[dict[str, str]], bool]:
     """Lightweight structural pre-check (pure Python, FR-044).
 
     Returns:
@@ -144,13 +143,10 @@ async def upload_dataset_service(
     # 5. Stream upload to storage
     dataset_id = uuid7()
     object_key = raw_key(dataset_id, file_name)
-    content_type = (
-        file.content_type
-        or (
-            "text/csv"
-            if lower_name.endswith(".csv")
-            else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    content_type = file.content_type or (
+        "text/csv"
+        if lower_name.endswith(".csv")
+        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     storage = get_storage()
     await storage.put(object_key, data, content_type=content_type)
@@ -167,6 +163,11 @@ async def upload_dataset_service(
         version=1,
     )
     session.add(dataset)
+    try:
+        await session.flush()  # the name check above races concurrent uploads
+    except IntegrityError:
+        await session.rollback()
+        raise DatasetsErrors.DATASET_NAME_TAKEN from None
 
     for item in quarantine_items:
         session.add(
@@ -203,7 +204,7 @@ async def upload_dataset_service(
 
     # 8. Record audit event
     await record_audit(
-            session=session,
+        session=session,
         user_id=principal.user_id,
         user_role=principal.role,
         event_type="dataset.upload",

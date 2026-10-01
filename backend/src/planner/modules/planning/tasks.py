@@ -169,8 +169,17 @@ def build_steps_from_rules(
             if pk_col:
                 break
     if not pk_col:
-        if "invoice_number" in df.columns:
-            pk_col = "invoice_number"
+        # No unique key inferred: link child rows on the identifier-typed column with
+        # the most distinct values (FR-050: chosen from the profile, never by name).
+        identifiers = [
+            c
+            for c in columns_info
+            if getattr(c, "semantic_type", "") == "identifier"
+            and (getattr(c, "column_name", None) or getattr(c, "name", None)) in df.columns
+        ]
+        if identifiers:
+            best = max(identifiers, key=lambda c: getattr(c, "distinct_count", 0) or 0)
+            pk_col = getattr(best, "column_name", None) or getattr(best, "name", None)
         elif df.columns:
             pk_col = df.columns[0]
         else:
@@ -183,7 +192,9 @@ def build_steps_from_rules(
         c_name = getattr(col, "column_name", None) or getattr(col, "name", None)
         flags = getattr(col, "flags", []) or []
         sem_type = getattr(col, "semantic_type", "")
-        if c_name in df.columns and ("all_null" in flags or (sem_type == "unknown" and "all_null" in flags)):
+        if c_name in df.columns and (
+            "all_null" in flags or (sem_type == "unknown" and "all_null" in flags)
+        ):
             drop_null_steps.append(
                 StepCandidate(
                     operation="drop_column",
@@ -280,7 +291,9 @@ def build_steps_from_rules(
             c_name = cols[0] if cols else expr.get("column")
             if not c_name or c_name not in df.columns or c_name in seen_drop_cols:
                 continue
-            child_tbl = expr.get("child_table", "LineItems")
+            child_tbl = expr.get("child_table") or "".join(
+                p.capitalize() for p in c_name.split("_") if p
+            )
             nested_steps.append(
                 StepCandidate(
                     operation="expand_nested",
@@ -478,7 +491,11 @@ async def _generate_plan_impl(
         db_plan = await session.get(Plan, plan_id)
         if db_plan:
             db_plan.total_estimated_loss = total_loss
-        threshold = float(db_plan.loss_threshold) if db_plan and db_plan.loss_threshold is not None else 0.05
+        threshold = (
+            float(db_plan.loss_threshold)
+            if db_plan and db_plan.loss_threshold is not None
+            else 0.05
+        )
 
         for i, (cand, loss) in enumerate(zip(final_steps, step_losses), start=1):
             step_row = PlanStep(

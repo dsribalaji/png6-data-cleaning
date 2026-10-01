@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -10,11 +10,19 @@ import polars as pl
 
 
 @dataclass
+class QuarantinedRow:
+    row_ref: str  # source row number as the user sees it, e.g. "row 7" (header is row 1)
+    reason: str
+    cells: list[str]
+
+
+@dataclass
 class IngestResult:
     table: pl.DataFrame
     quarantined: pl.DataFrame
     warnings: list[str]
     stats: dict[str, Any]
+    quarantine: list[QuarantinedRow] = field(default_factory=list)
 
 
 def _is_cell_empty(val: Any) -> bool:
@@ -29,37 +37,54 @@ def _is_row_empty(row: list[Any] | tuple[Any, ...]) -> bool:
     return all(_is_cell_empty(c) for c in row)
 
 
+def _malformed_reason(row: list[Any], header_width: int) -> str | None:
+    """Why a row cannot be parsed against the header, or None if it can (FR-044).
+
+    Generic rules only (FR-050): a row is malformed when it has data beyond the
+    header (a shifted or ragged row) or text that failed to decode. A missing
+    value is NOT malformed; it stays in the table as null.
+    """
+    extra = [c for c in row[header_width:] if not _is_cell_empty(c)]
+    if extra:
+        return f"Row has {len(extra)} more cell(s) than the header has columns"
+    if any(isinstance(c, str) and "\ufffd" in c for c in row):
+        return "Row contains characters that could not be decoded"
+    return None
+
+
 def _process_tabular_data(
     raw_header: list[Any],
     raw_data: list[list[Any]],
-    is_reference_dataset: bool = False,
 ) -> IngestResult:
-    # 1. Drop fully-null rows (padding rows)
+    # Header width = up to the last named column; columns after it have no header,
+    # so any data found there means the row is shifted.
+    named = [i for i, h in enumerate(raw_header) if not _is_cell_empty(h)]
+    header_width = named[-1] + 1 if named else len(raw_header)
+
+    # 1. Drop fully-null rows (padding rows); quarantine malformed rows (FR-044)
     data_rows: list[list[Any]] = []
+    quarantine: list[QuarantinedRow] = []
     padding_rows_dropped = 0
-    for r in raw_data:
+    for idx, r in enumerate(raw_data):
         if _is_row_empty(r):
             padding_rows_dropped += 1
+            continue
+        reason = _malformed_reason(list(r), header_width)
+        if reason:
+            cells = ["" if _is_cell_empty(c) else str(c) for c in r]
+            quarantine.append(QuarantinedRow(row_ref=f"row {idx + 2}", reason=reason, cells=cells))
         else:
             data_rows.append(list(r))
 
-    # 2. Identify fully-null columns (header empty AND all data values empty)
-    num_cols = len(raw_header)
-    empty_col_indices: set[int] = set()
+    # 2. Retain named columns, and unnamed columns inside the header that hold data
     retained_col_indices: list[int] = []
-
-    for c_idx in range(num_cols):
-        h = raw_header[c_idx]
-        h_empty = _is_cell_empty(h)
-        col_all_empty = all(
-            _is_cell_empty(r[c_idx]) if c_idx < len(r) else True for r in data_rows
-        )
-        if h_empty and col_all_empty:
-            empty_col_indices.add(c_idx)
-        else:
+    for c_idx in range(header_width):
+        h_empty = _is_cell_empty(raw_header[c_idx])
+        col_all_empty = all(_is_cell_empty(r[c_idx]) if c_idx < len(r) else True for r in data_rows)
+        if not (h_empty and col_all_empty):
             retained_col_indices.append(c_idx)
 
-    empty_columns_dropped = len(empty_col_indices)
+    empty_columns_dropped = len(raw_header) - len(retained_col_indices)
 
     # 3. Clean headers for retained columns
     headers: list[str] = []
@@ -70,34 +95,35 @@ def _process_tabular_data(
         else:
             headers.append(str(h).strip())
 
-    # 4. Filter cells to retained columns and identify quarantined rows
-    table_rows: list[list[Any]] = []
-    quarantined_rows: list[list[Any]] = []
-
-    for r in data_rows:
-        filtered_row = [r[c_idx] if c_idx < len(r) else None for c_idx in retained_col_indices]
-        first_cell = filtered_row[0] if filtered_row else None
-        first_is_empty = _is_cell_empty(first_cell)
-        has_other_data = any(not _is_cell_empty(c) for c in filtered_row[1:])
-
-        if not is_reference_dataset and first_is_empty and has_other_data:
-            quarantined_rows.append(filtered_row)
-        else:
-            table_rows.append(filtered_row)
+    # 4. Filter cells to retained columns
+    table_rows = [
+        [r[c_idx] if c_idx < len(r) else None for c_idx in retained_col_indices] for r in data_rows
+    ]
 
     # 5. Build Polars DataFrames
+    warnings: list[str] = []
     if table_rows:
         table_df = pl.DataFrame(table_rows, schema=headers, orient="row")
     else:
         table_df = pl.DataFrame({h: [] for h in headers})
 
-    if quarantined_rows:
-        quarantined_df = pl.DataFrame(quarantined_rows, schema=headers, orient="row")
+    if quarantine:
+        width = max(len(q.cells) for q in quarantine)
+        quarantined_df = pl.DataFrame(
+            {
+                "row_ref": [q.row_ref for q in quarantine],
+                "reason": [q.reason for q in quarantine],
+                **{
+                    f"cell_{i + 1}": [q.cells[i] if i < len(q.cells) else "" for q in quarantine]
+                    for i in range(width)
+                },
+            }
+        )
+        warnings.append(f"{len(quarantine)} malformed row(s) quarantined")
     else:
-        quarantined_df = pl.DataFrame([], schema=table_df.schema)
+        quarantined_df = pl.DataFrame()
 
     # 6. Check sparse columns (>= 95% nulls) and warnings
-    warnings: list[str] = []
     sparse_columns: list[str] = []
     total_table_rows = len(table_df)
 
@@ -118,6 +144,7 @@ def _process_tabular_data(
         "padding_rows_dropped": padding_rows_dropped,
         "empty_columns_dropped": empty_columns_dropped,
         "sparse_columns": sparse_columns,
+        "quarantined_rows": len(quarantine),
     }
 
     return IngestResult(
@@ -125,6 +152,7 @@ def _process_tabular_data(
         quarantined=quarantined_df,
         warnings=warnings,
         stats=stats,
+        quarantine=quarantine,
     )
 
 
@@ -158,15 +186,7 @@ def read_workbook(path: str | Path, sheet: str | int = 0) -> IngestResult:
     raw_header = list(all_rows[0])
     raw_data = [list(r) for r in all_rows[1:]]
 
-    path_obj = Path(path)
-    is_ref = "vendorinvoices" in path_obj.name.lower() or (
-        len(raw_header) >= 14
-        and str(raw_header[0]).strip() == "invoice_date"
-        and str(raw_header[1]).strip() == "invoice_number"
-        and str(raw_header[3]).strip() == "supplier_name"
-    )
-
-    return _process_tabular_data(raw_header, raw_data, is_reference_dataset=is_ref)
+    return _process_tabular_data(raw_header, raw_data)
 
 
 def read_csv(path: str | Path) -> IngestResult:
@@ -193,16 +213,9 @@ def read_csv(path: str | Path) -> IngestResult:
     raw_header = all_rows[0]
     raw_data = all_rows[1:]
 
-    is_ref = "vendorinvoices" in path_obj.name.lower() or (
-        len(raw_header) >= 14
-        and str(raw_header[0]).strip() == "invoice_date"
-        and str(raw_header[1]).strip() == "invoice_number"
-        and str(raw_header[3]).strip() == "supplier_name"
-    )
-
     # In CSV, convert empty strings to None for proper null handling
     converted_data: list[list[Any]] = []
     for r in raw_data:
         converted_data.append([None if _is_cell_empty(c) else c for c in r])
 
-    return _process_tabular_data(raw_header, converted_data, is_reference_dataset=is_ref)
+    return _process_tabular_data(raw_header, converted_data)

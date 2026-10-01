@@ -186,6 +186,39 @@ async def test_upload_dataset__duplicate_name__raises_dataset_name_taken(
 
 
 @pytest.mark.asyncio
+async def test_upload_dataset__concurrent_same_name__raises_dataset_name_taken(
+    async_session: AsyncSession,
+    mock_storage: InMemoryStorage,
+    principal: RequestPrincipal,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Another upload commits the same name after our existence check ran.
+    async_session.add(
+        Dataset(
+            id=uuid7(), name="race.csv", source="upload", file_name="race.csv", status="profiling"
+        )
+    )
+    await async_session.commit()
+    real_execute = async_session.execute
+    calls = {"n": 0}
+
+    async def first_check_misses(stmt, *args, **kwargs):  # type: ignore[no-untyped-def]
+        calls["n"] += 1
+        result = await real_execute(stmt, *args, **kwargs)
+        if calls["n"] == 1:  # the name-uniqueness SELECT
+            result.scalar_one_or_none = lambda: None  # type: ignore[method-assign]
+        return result
+
+    monkeypatch.setattr(async_session, "execute", first_check_misses)
+    upload_file = UploadFile(file=io.BytesIO(b"a,b\n1,2"), filename="race.csv")
+
+    with pytest.raises(AppError) as exc_info:
+        await upload_dataset_service(file=upload_file, session=async_session, principal=principal)
+
+    assert exc_info.value.code == "DATASET_NAME_TAKEN"
+
+
+@pytest.mark.asyncio
 async def test_upload_dataset__file_exceeds_max_mb__raises_file_too_large(
     async_session: AsyncSession,
     mock_storage: InMemoryStorage,

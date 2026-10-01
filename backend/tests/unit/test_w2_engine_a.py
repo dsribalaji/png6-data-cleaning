@@ -51,25 +51,35 @@ def test_ingest_reference_workbook__golden_expectations() -> None:
     assert len(res.warnings) >= 2
 
 
-def test_ingest_csv__malformed_row_quarantined_and_empty_dropped(tmp_path: Path) -> None:
+def test_ingest_csv__ragged_row_quarantined_missing_value_kept(tmp_path: Path) -> None:
     csv_file = tmp_path / "sample.csv"
     csv_content = (
         "id,name,amount,,\n"
         "1,Acme,100,,\n"
-        ",Malformed,200,,\n"
-        "3,Beta,300,,\n"
+        ",Missing id,200,,\n"  # a missing value is data, not a malformed row
+        "3,Beta,300,shifted,\n"  # data beyond the header = shifted row
         ",,,,\n"
     )
     csv_file.write_text(csv_content, encoding="utf-8")
 
     res = read_csv(csv_file)
     assert res.table.shape == (2, 3)
+    assert res.table["name"].to_list() == ["Acme", "Missing id"]
+    assert [(q.row_ref, q.cells[1]) for q in res.quarantine] == [("row 4", "Beta")]
+    assert "more cell" in res.quarantine[0].reason
     assert len(res.quarantined) == 1
-    assert res.quarantined["name"][0] == "Malformed"
+    assert res.stats["quarantined_rows"] == 1
     assert res.stats["padding_rows_dropped"] == 1
     assert res.stats["empty_columns_dropped"] == 2
-    assert res.stats["row_count"] == 2
-    assert res.stats["column_count"] == 3
+
+
+def test_ingest_reference_workbook__renamed_file__same_result(tmp_path: Path) -> None:
+    """FR-050: no special case keyed on the file name."""
+    renamed = tmp_path / "anything.xlsx"
+    renamed.write_bytes(_get_reference_workbook_path().read_bytes())
+    res = read_workbook(renamed)
+    assert res.table.shape == (22, 14)
+    assert res.quarantine == []
 
 
 def test_parquet_roundtrip(tmp_path: Path) -> None:

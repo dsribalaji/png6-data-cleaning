@@ -2,6 +2,21 @@
 
 Newest first. Each entry: date, decider, decision, rationale, status (active / superseded / proposed).
 
+## 2026-10-01 — Level 3 plan defaults accepted (SB)
+
+**Decision:** SB accepted the PROPOSED defaults in `docs/LEVEL3_PLAN.md` §3:
+- D1 (OQ-11) LLM provider at launch: Groq `openai/gpt-oss-120b` via LiteLLM, plus one open-weight fallback on any OpenAI-compatible endpoint.
+- D2 (OQ-10) data sent to models: off by default — schema + stats + at most 5 masked samples per column; an Administrator may opt in per model config.
+- D3 cloud target: one cloud VM running the same Docker Compose stack, a domain with Let's Encrypt TLS (Kubernetes stays Level 4).
+- D4 SSO/MFA: self-hosted Keycloak with required TOTP MFA for all roles.
+- D5 evaluation pass bar: 0 crashes; 100% of malformed rows quarantined; at least 95% of injected cells flagged; rule recall at least 0.9 on the labelled sets; LLM-on scores at least LLM-off.
+- D6 loss metric: split into *data loss* (rows or values destroyed) and *cells changed*; only data loss is checked against the 5% limit.
+- D7 (OQ-05) target date: still OPEN (no default offered).
+
+**Rationale:** Unblocks Level 3 milestone M0; each default follows the tech stack deck, Backend.md or the Level 2 benchmark findings.
+
+**Status:** active.
+
 ## 2026-09-30 — Level 2 exit gate met end to end (HTTP + browser); fixes to reach it (Claude, for SB)
 
 **Decision:** Close the gaps between the integrated build and the Level-2 exit gate, and prove it with a no-stub test: `backend/tests/api/test_exit_gate.py` (upload → validated export → rollback over HTTP on the reference file) plus a live browser walk-through (`frontend/scripts/live-walkthrough.mjs`).

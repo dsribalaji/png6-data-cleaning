@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from planner.engine.ingest.parquet import to_parquet
@@ -27,6 +27,9 @@ class DatasetIngestResult:
     column_count: int
     ingested_object_key: str
     warnings: list[str]
+    # FR-044: rows that could not be parsed, as (row_ref, reason); saved to
+    # quarantine/<dataset_id>.parquet so nothing is dropped silently.
+    quarantine: list[tuple[str, str]] = field(default_factory=list)
 
 
 async def ingest_dataset_file(raw_object_key: str) -> DatasetIngestResult:
@@ -73,11 +76,25 @@ async def ingest_dataset_file(raw_object_key: str) -> DatasetIngestResult:
         with open(parquet_path, "rb") as fh:
             parquet_bytes = fh.read()
 
+        quarantine_bytes = None
+        if result.quarantine:
+            q_path = os.path.join(tmpdir, "quarantine.parquet")
+            to_parquet(result.quarantined, q_path)
+            with open(q_path, "rb") as fh:
+                quarantine_bytes = fh.read()
+
     await storage.put(ingested_key, parquet_bytes, content_type="application/octet-stream")
+    if quarantine_bytes is not None:
+        await storage.put(
+            f"quarantine/{dataset_id}.parquet",
+            quarantine_bytes,
+            content_type="application/octet-stream",
+        )
 
     return DatasetIngestResult(
         row_count=result.table.height,
         column_count=result.table.width,
         ingested_object_key=ingested_key,
         warnings=list(result.warnings),
+        quarantine=[(q.row_ref, q.reason) for q in result.quarantine],
     )
