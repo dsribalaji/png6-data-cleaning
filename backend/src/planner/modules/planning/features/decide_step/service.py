@@ -135,4 +135,5 @@ async def decide_step(
         decision=step.decision,
         decision_reason=step.decision_reason,
         estimated_loss=loss_out,
+        source=step.source or "deterministic",
     )

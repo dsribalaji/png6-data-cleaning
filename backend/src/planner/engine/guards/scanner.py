@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import polars as pl
 
+# FR-045: text aimed at an LLM rather than being data. One case-insensitive regex,
+# usable by Python `re` and by Polars (Rust regex) for whole-column scans.
 INJECTION_PATTERNS: list[str] = [
-    "ignore previous instructions",
-    "ignore all instructions",
-    "system:",
-    "as an ai",
-    "drop table",
-    "<script",
-    "```",
-    "do not follow",
+    r"\b(ignore|disregard|forget|override)\b.{0,40}\b(instructions?|prompts?|rules)\b",
+    r"<\|?\s*(system|im_start|im_end|assistant)\s*\|?>",
+    r"(^|\n)\s*(system|assistant)\s*:",
+    r"\byou are now\b",
+    r"\b(reveal|print|show)\b.{0,30}\b(system prompt|secrets?|api keys?)\b",
+    r"\bdo not follow\b",
+    r"\bas an ai\b",
+    r"\bdrop\s+table\b",
+    r"<script",
+    r"```",
 ]
+INJECTION_REGEX = "(?is)" + "|".join(f"(?:{p})" for p in INJECTION_PATTERNS)
+_COMPILED = re.compile(INJECTION_REGEX)
 
 
 @dataclass
@@ -25,28 +32,45 @@ class InjectionFlag:
 
 
 def scan_prompt_injection(cells: list[tuple[str, int, str]]) -> list[InjectionFlag]:
-    """Scan cells for instruction-like substrings (prompt injection).
+    """Scan cells for instruction-like text (prompt injection).
 
-    Each cell is a tuple of (column_name, row_index, value).
-    Matches are case-insensitive.
+    Each cell is a tuple of (column_name, row_index, value). Matching is case-insensitive.
     """
     flags: list[InjectionFlag] = []
     for col, row_idx, val in cells:
         if val is None:
             continue
         val_str = str(val)
-        val_lower = val_str.lower()
-        for pat in INJECTION_PATTERNS:
-            if pat in val_lower:
-                flags.append(
-                    InjectionFlag(
-                        column=col,
-                        row=row_idx,
-                        value_preview=val_str[:60],
-                        reason=f"Matched prompt injection pattern: '{pat}'",
-                    )
+        m = _COMPILED.search(val_str)
+        if m:
+            flags.append(
+                InjectionFlag(
+                    column=col,
+                    row=row_idx,
+                    value_preview=val_str[:60],
+                    reason=f"Looks like an instruction to an AI model: '{m.group(0)[:40].lower()}'",
                 )
-                break
+            )
+    return flags
+
+
+def scan_frame(df: pl.DataFrame, limit: int = 200) -> list[InjectionFlag]:
+    """Scan every text column of a frame (vectorised; cheap on large tables)."""
+    flags: list[InjectionFlag] = []
+    for col in df.columns:
+        if df.schema[col] != pl.Utf8:
+            continue
+        hits = (
+            df.select(pl.col(col))
+            .with_row_index("_row")
+            .filter(pl.col(col).str.contains(INJECTION_REGEX))
+            .head(limit - len(flags))
+        )
+        flags += scan_prompt_injection(
+            [(col, int(r), v) for r, v in zip(hits["_row"], hits[col], strict=True)]
+        )
+        if len(flags) >= limit:
+            break
     return flags
 
 

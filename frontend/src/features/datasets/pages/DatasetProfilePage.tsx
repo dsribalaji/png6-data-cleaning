@@ -34,6 +34,8 @@ import {
   useRules,
 } from "../api";
 import { InferredRulesList } from "../components/InferredRulesList";
+import { FlaggedCellsCard } from "../components/FlaggedCellsCard";
+import { AiStatusBanner } from "../../../shared/ui/AiStatusBanner";
 import { ProfileGrid } from "../components/ProfileGrid";
 import { QuarantineDrawer } from "../components/QuarantineDrawer";
 import { StatusBadge } from "../components/StatusBadge";
@@ -310,10 +312,17 @@ export function DatasetProfilePage() {
         </div>
       </Card>
 
+      <AiStatusBanner
+        status={profileQuery.data?.aiStatus}
+        message={profileQuery.data?.aiMessage}
+      />
+
       <InferredRulesList
         rules={rulesQuery.data}
         loading={rulesQuery.isPending || rulesQuery.isFetching}
       />
+
+      <FlaggedCellsCard cells={profileQuery.data?.flaggedCells} />
 
       <QuarantineDrawer
         isOpen={isQuarantineOpen}

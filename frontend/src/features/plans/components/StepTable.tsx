@@ -12,6 +12,7 @@ import type { PlanStep } from "../../../api/schema";
 import { cx, formatInt } from "../../../shared/lib/format";
 import { MESSAGES } from "../../../shared/constants/messages";
 import { Badge } from "../../../shared/ui/Badge";
+import { MSG_AI_TAG, MSG_AI_TAG_TITLE } from "../../../shared/constants/messages";
 import { RadioGroup } from "../../../shared/ui/RadioGroup";
 import { Skeleton } from "../../../shared/ui/Skeleton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
@@ -89,6 +90,11 @@ export function StepTable({
             >
               {describeStep(row.original)}
             </button>
+            {row.original.source === "llm" && (
+              <Badge variant="info" title={MSG_AI_TAG_TITLE}>
+                {MSG_AI_TAG}
+              </Badge>
+            )}
             {row.original.decisionReason && (
               <span className="text-xs italic text-[#6c757d] dark:text-[#a0aec0]">
                 {row.original.decisionReason}

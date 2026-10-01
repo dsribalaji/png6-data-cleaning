@@ -23,7 +23,7 @@ from planner.core.events import (
 )
 from planner.core.outbox import add_event
 from planner.core.ports.llm import LlmGatewayPort
-from planner.engine.guards.scanner import mask_sample, scan_prompt_injection
+from planner.engine.guards.scanner import mask_sample, scan_frame, scan_prompt_injection
 from planner.engine.infer.rules import InferredRule, infer_rules
 from planner.engine.ingest.parquet import read_parquet
 from planner.engine.profile.profiler import ColumnProfile, TableProfile, profile_table
@@ -48,18 +48,11 @@ class DatasetRef:
     ingested_object_key: str
 
 
-def _llm_gateway() -> LlmGatewayPort | None:
-    """Single sanctioned composition point for LLM gateway.
+def _llm_gateway() -> LlmGatewayPort:
+    """The admin's saved model (else env vars), with the Redis cache (Level 3 B1)."""
+    from planner.modules.model_config.public import build_llm_gateway
 
-    Lazily imports planner.llm.gateway.LlmGateway, returning None on any failure
-    (e.g. gateway not implemented, missing API key, etc.).
-    """
-    try:
-        from planner.llm.gateway import LlmGateway
-
-        return LlmGateway()
-    except Exception:
-        return None
+    return build_llm_gateway()
 
 
 class _ColumnMeta(BaseModel):
@@ -87,13 +80,16 @@ class _RulesOut(BaseModel):
     rules: list[_RuleOut]
 
 
-async def _try_llm_rules(df: pl.DataFrame, profile: TableProfile) -> list[InferredRule]:
-    """Invoke LLM gateway for semantic rule inference with strict data minimisation."""
-    gateway = _llm_gateway()
-    if gateway is None:
-        return []
+async def _try_llm_rules(
+    df: pl.DataFrame, profile: TableProfile
+) -> tuple[list[InferredRule], BaseException | None]:
+    """LLM rule inference with strict data minimisation.
 
+    Never raises: returns the rules and the exception (if any) so the caller can show
+    why AI suggestions are missing instead of dropping the failure silently.
+    """
     try:
+        gateway = _llm_gateway()
         # Data minimisation: <= 5 samples per column, prompt injection scanning, masking
         samples: dict[str, list[str]] = {}
         for col in profile.columns:
@@ -145,10 +141,10 @@ async def _try_llm_rules(df: pl.DataFrame, profile: TableProfile) -> list[Inferr
                     source="llm",
                 )
             )
-        return rules
-    except Exception:
+        return rules, None
+    except Exception as exc:
         # LLM failure must never break the deterministic pipeline
-        return []
+        return [], exc
 
 
 async def _load_parquet_frame(dataset_id: UUID) -> tuple[pl.DataFrame, str]:
@@ -205,6 +201,7 @@ async def _profile_dataset_impl(dataset_id_str: str, job_id_str: str) -> dict[st
     # Load dataframe from storage
     df, table_name = await _load_parquet_frame(dataset_id)
     profile = profile_table(df, table_name=table_name)
+    flagged = scan_frame(df)  # FR-045: shown to the user, never sent to a model
 
     async with SessionLocal() as session:
         run_row = ProfileRun(
@@ -212,6 +209,10 @@ async def _profile_dataset_impl(dataset_id_str: str, job_id_str: str) -> dict[st
             row_count=profile.row_count,
             column_count=profile.column_count,
             issues=profile.issues,
+            flagged_cells=[
+                {"column": f.column, "row": f.row, "preview": f.value_preview, "reason": f.reason}
+                for f in flagged
+            ],
         )
         session.add(run_row)
 
@@ -303,7 +304,10 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
     deterministic_rules = infer_rules(df, profile)
 
     # LLM extra rules (non-blocking)
-    llm_rules = await _try_llm_rules(df, profile)
+    llm_rules, llm_exc = await _try_llm_rules(df, profile)
+    from planner.modules.model_config.public import describe_llm_outcome
+
+    ai_status, ai_message = describe_llm_outcome(llm_exc)
 
     # Merge and deduplicate by (rule_type, tuple(columns))
     seen_keys: set[tuple[str, tuple[str, ...]]] = set()
@@ -335,6 +339,12 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
             )
             session.add(row)
 
+        run = (
+            await session.execute(select(ProfileRun).where(ProfileRun.dataset_id == dataset_id))
+        ).scalar_one_or_none()
+        if run is not None:
+            run.ai_status, run.ai_message = ai_status, ai_message
+
         await add_event(
             session,
             EventType.RULES_INFERRED,
@@ -346,8 +356,16 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
             event_type="rules.inferred",
             object_type="dataset",
             object_id=str(dataset_id),
-            details={"rules": len(merged)},
+            details={"rules": len(merged), "aiStatus": ai_status},
         )
+        if ai_status == "failed":
+            await record_audit(
+                session=session,
+                event_type="llm.failed",
+                object_type="dataset",
+                object_id=str(dataset_id),
+                details={"task": "infer_rules", "message": ai_message},
+            )
 
     # Defensive realtime notification
     try:

@@ -10,6 +10,7 @@ from uuid import UUID
 import uuid
 
 import openpyxl
+import polars as pl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.audit import record_audit
@@ -18,6 +19,23 @@ from planner.modules.execution.errors import ExecutionErrors
 from planner.modules.execution.models import ExportRow
 from planner.modules.execution.schemas import ExportRequest, ExportResponse
 
+
+
+# C5 / OWASP CSV injection: text a spreadsheet would run as a formula gets a leading
+# apostrophe. A leading "-" is left alone when the cell is just a number ("-12.5").
+_FORMULA_START = r"^[=+@\t\r]|^-[^0-9.]"
+
+
+def neutralise_formulas(frame: pl.DataFrame) -> pl.DataFrame:
+    """Return the frame with formula-like text cells made inert for Excel/CSV."""
+    text_cols = [c for c, t in frame.schema.items() if t == pl.Utf8]
+    return frame.with_columns(
+        pl.when(pl.col(c).str.contains(_FORMULA_START))
+        .then(pl.lit("'") + pl.col(c))
+        .otherwise(pl.col(c))
+        .alias(c)
+        for c in text_cols
+    )
 
 async def create_export(
     session: AsyncSession,
@@ -76,6 +94,7 @@ async def create_export(
     else:
         tables = {"main": await read_snapshot_frame(plan_id, current)}
         tables.update(await list_side_tables(plan_id, current))
+        tables = {name: neutralise_formulas(frame) for name, frame in tables.items()}
         if fmt == "xlsx":
             wb = openpyxl.Workbook()
             wb.remove(wb.active)

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 def _to_camel(name: str) -> str:
@@ -37,6 +37,7 @@ class PlanStepOut(CamelModel):
     decision: str
     decision_reason: str | None = None
     estimated_loss: LossEstimateOut | None = None
+    source: str = "deterministic"  # "llm" = AI-suggested (Level 3 B5)
 
 
 class PlanOut(CamelModel):
@@ -47,6 +48,15 @@ class PlanOut(CamelModel):
     loss_threshold: float
     steps: list[PlanStepOut] = Field(default_factory=list)
     created_at: datetime
+    # Level 3 B2: "used" | "off" | "failed" for AI step proposals, and why.
+    ai_status: str | None = None
+    ai_message: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def confidence(self) -> float | None:
+        """FR-046: the plan is only as confident as its least confident step."""
+        return min((s.confidence for s in self.steps), default=None)
 
 
 class CreatePlanRequest(CamelModel):

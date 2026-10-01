@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MSG_AI_TAG, MSG_AI_TAG_TITLE } from "../../../shared/constants/messages";
 import { IconBulb } from "@tabler/icons-react";
 import type { InferredRule } from "../../../api/schema";
 import { Badge } from "../../../shared/ui/Badge";
@@ -164,6 +165,11 @@ export function InferredRulesList({ rules, loading = false }: InferredRulesListP
                   <Badge variant="secondary">
                     {RULE_TYPE_LABELS[rule.ruleType] ?? rule.ruleType}
                   </Badge>
+                  {rule.source === "llm" && (
+                    <Badge variant="info" title={MSG_AI_TAG_TITLE}>
+                      {MSG_AI_TAG}
+                    </Badge>
+                  )}
                   {rule.columns.length > 0 && (
                     <span className="text-xs text-[#6c757d] dark:text-[#a0aec0]">
                       {rule.columns.join(", ")}

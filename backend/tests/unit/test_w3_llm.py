@@ -405,7 +405,7 @@ async def test_test_connection_success_and_failure(monkeypatch: pytest.MonkeyPat
     def fake_completion_success(**kwargs: Any) -> dict[str, Any]:
         return {"choices": [{"message": {"content": "OK"}}]}
 
-    monkeypatch.setattr("planner.llm.gateway.litellm.completion", fake_completion_success)
+    monkeypatch.setattr("planner.llm.gateway._completion", fake_completion_success)
 
     config = ResolvedModelConfig(provider="groq", model=DEFAULT_MODEL, api_key="valid_key")
     elapsed = await gateway_test_connection(config)
@@ -416,7 +416,7 @@ async def test_test_connection_success_and_failure(monkeypatch: pytest.MonkeyPat
     def fake_completion_failure(**kwargs: Any) -> Any:
         raise ConnectionError("Network unreachable")
 
-    monkeypatch.setattr("planner.llm.gateway.litellm.completion", fake_completion_failure)
+    monkeypatch.setattr("planner.llm.gateway._completion", fake_completion_failure)
 
     with pytest.raises(LlmConnectionError) as exc_info:
         await gateway_test_connection(config)

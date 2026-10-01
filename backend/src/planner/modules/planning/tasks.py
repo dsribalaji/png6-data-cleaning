@@ -27,6 +27,9 @@ from planner.worker import celery_app
 
 logger = logging.getLogger(__name__)
 
+# Steps below this confidence are never pre-accepted (Level 3 B5).
+LOW_CONFIDENCE = 0.6
+
 
 @dataclass
 class StepCandidate:
@@ -34,20 +37,54 @@ class StepCandidate:
     parameters: dict[str, Any]
     rationale: str
     confidence: float
+    source: str = "deterministic"  # "llm" for AI-suggested steps (Level 3 B5)
 
 
-def _llm_gateway() -> LlmGatewayPort | None:
-    """Single sanctioned composition point for LLM gateway.
+def _llm_gateway() -> LlmGatewayPort:
+    """The admin's saved model (else env vars), with the Redis cache (Level 3 B1)."""
+    from planner.modules.model_config.public import build_llm_gateway
 
-    Lazily imports planner.llm.gateway.LlmGateway, returning None on any failure
-    (e.g. gateway not implemented, missing API key, etc.).
+    return build_llm_gateway()
+
+
+def merge_steps(
+    deterministic: list[StepCandidate], llm: list[StepCandidate], df: pl.DataFrame
+) -> tuple[list[StepCandidate], list[str]]:
+    """Deterministic steps first; AI steps added when they target something new.
+
+    Level 3 B4: an AI step enters the plan only if its parameters validate against the
+    schema AND its loss can be estimated on the real data (a dry run of the operation).
+    Returns the merged steps and a description of each AI step that was left out.
     """
-    try:
-        from planner.llm.gateway import LlmGateway
+    schema = {col: str(df.schema[col]) for col in df.columns}
 
-        return LlmGateway()
-    except Exception:
-        return None
+    def key(c: StepCandidate) -> tuple[str, str]:
+        return c.operation, str(c.parameters.get("column") or c.parameters.get("name") or "")
+
+    final = list(deterministic)
+    seen = {key(c) for c in deterministic}
+    rejected: list[str] = []
+    for c in llm:
+        if key(c) in seen:
+            continue
+        try:
+            if c.operation not in OPS:
+                raise ValueError("not in the operation catalogue")
+            OPS[c.operation].validate(c.parameters, schema)
+            estimate_step_loss(df, c.operation, c.parameters)
+        except Exception as exc:
+            rejected.append(f"{c.operation}({key(c)[1] or '?'}): {str(exc)[:80]}")
+            logger.info("llm step rejected: %s %s: %s", c.operation, c.parameters, exc)
+            continue
+        seen.add(key(c))
+        final.append(c)
+    return final, rejected
+
+
+def default_decision(estimated_loss: float, threshold: float, confidence: float) -> str:
+    """PRD S5 / FR-031: steps at or under the loss threshold start as Accept; steps above
+    it, or with low confidence (Level 3 B5), wait for an explicit decision."""
+    return "accepted" if estimated_loss <= threshold and confidence >= LOW_CONFIDENCE else "pending"
 
 
 class _ProposedStep(BaseModel):
@@ -73,13 +110,10 @@ async def _try_llm_steps(
     rules: list[Any],
     columns_info: list[Any],
     table_name: str,
-) -> list[StepCandidate]:
-    """Invoke LLM gateway for additional cleaning step proposals."""
-    gateway = _llm_gateway()
-    if gateway is None:
-        return []
-
+) -> tuple[list[StepCandidate], BaseException | None]:
+    """LLM step proposals. Never raises: returns the steps and the exception, if any."""
     try:
+        gateway = _llm_gateway()
         samples: dict[str, list[str]] = {}
         for c in columns_info:
             c_name = getattr(c, "column_name", None) or getattr(c, "name", None)
@@ -132,11 +166,12 @@ async def _try_llm_steps(
                         parameters=s.parameters,
                         rationale=s.rationale,
                         confidence=float(s.confidence),
+                        source="llm",
                     )
                 )
-        return candidates
-    except Exception:
-        return []
+        return candidates, None
+    except Exception as exc:
+        return [], exc
 
 
 def build_steps_from_rules(
@@ -439,34 +474,22 @@ async def _generate_plan_impl(
     )
 
     # Attempt LLM steps
-    llm_steps = await _try_llm_steps(
+    llm_steps, llm_exc = await _try_llm_steps(
         df=df,
         rules=rule_rows,
         columns_info=column_rows,
         table_name=getattr(ds_info, "name", "dataset"),
     )
 
-    # Merge and deduplicate
-    schema = {col: str(df.schema[col]) for col in df.columns}
-    seen_ops: set[tuple[str, str]] = set()
-    final_steps: list[StepCandidate] = []
+    final_steps, rejected = merge_steps(deterministic_steps, llm_steps, df)
 
-    for s in deterministic_steps:
-        target_col = str(s.parameters.get("column") or s.parameters.get("name") or "")
-        key_op = (s.operation, target_col)
-        seen_ops.add(key_op)
-        final_steps.append(s)
+    from planner.modules.model_config.public import describe_llm_outcome
 
-    for s in llm_steps:
-        target_col = str(s.parameters.get("column") or s.parameters.get("name") or "")
-        key_op = (s.operation, target_col)
-        if key_op not in seen_ops:
-            try:
-                OPS[s.operation].validate(s.parameters, schema)
-                seen_ops.add(key_op)
-                final_steps.append(s)
-            except Exception:
-                pass
+    ai_status, ai_message = describe_llm_outcome(llm_exc)
+    if ai_status == "used" and rejected:
+        ai_message = f"{len(rejected)} AI-suggested step(s) were invalid and left out: " + "; ".join(
+            rejected[:5]
+        )
 
     # Compute loss per step on df
     step_losses: list[LossEstimate] = []
@@ -491,6 +514,7 @@ async def _generate_plan_impl(
         db_plan = await session.get(Plan, plan_id)
         if db_plan:
             db_plan.total_estimated_loss = total_loss
+            db_plan.ai_status, db_plan.ai_message = ai_status, ai_message
         threshold = (
             float(db_plan.loss_threshold)
             if db_plan and db_plan.loss_threshold is not None
@@ -505,9 +529,8 @@ async def _generate_plan_impl(
                 parameters=cand.parameters,
                 rationale=cand.rationale,
                 confidence=cand.confidence,
-                # PRD S5 / FR-031: steps at or under the loss threshold default to Accept;
-                # only steps above it are held for an explicit decision.
-                decision="accepted" if loss.estimated_loss <= threshold else "pending",
+                source=cand.source,
+                decision=default_decision(loss.estimated_loss, threshold, cand.confidence),
             )
             session.add(step_row)
             await session.flush()
@@ -527,6 +550,16 @@ async def _generate_plan_impl(
             PlanGeneratedPayload(plan_id=plan_id),
         )
         await session.commit()
+        if ai_status == "failed":
+            from planner.core.audit import record_audit
+
+            await record_audit(
+                session=session,
+                event_type="llm.failed",
+                object_type="plan",
+                object_id=str(plan_id),
+                details={"task": "propose_steps", "message": ai_message},
+            )
 
     # Defensive realtime notification
     try:

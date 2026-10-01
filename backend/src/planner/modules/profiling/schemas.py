@@ -34,6 +34,13 @@ class ColumnProfileOut(CamelModel):
     flags: list[str] = Field(default_factory=list)
 
 
+class FlaggedCellOut(CamelModel):
+    column: str
+    row: int
+    preview: str
+    reason: str
+
+
 class ProfileResponse(CamelModel):
     dataset_id: UUID
     row_count: int
@@ -41,6 +48,11 @@ class ProfileResponse(CamelModel):
     columns: list[ColumnProfileOut]
     issues: list[str] = Field(default_factory=list)
     profiled_at: datetime
+    # Level 3 B2: "used" | "off" | "failed" (None until rules are inferred) and why.
+    ai_status: str | None = None
+    ai_message: str | None = None
+    # FR-045: cells that look like instructions to an AI model; never sent to one.
+    flagged_cells: list[FlaggedCellOut] = Field(default_factory=list)
 
 
 class RuleOut(CamelModel):

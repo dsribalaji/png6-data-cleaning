@@ -2,54 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import planner.llm.gateway as _gateway
+from planner.core.config import settings
+from planner.core.db import SessionLocal
+from planner.llm.gateway import LlmGateway, ResolvedModelConfig, resolve_env_config
+from planner.llm.cache import LlmCache
 from planner.modules.model_config.crypto import decrypt_credential
 from planner.modules.model_config.models import ModelConfig
-
-# Ensure gateway defines ResolvedModelConfig, LlmConnectionError,
-# and test_connection if not yet present
-if not hasattr(_gateway, "ResolvedModelConfig"):
-
-    @dataclass
-    class _ResolvedModelConfig:
-        provider: str
-        model: str
-        endpoint_url: str | None = None
-        api_key: str | None = None
-        allow_data_sharing: bool = False
-
-    _gateway.ResolvedModelConfig = _ResolvedModelConfig  # type: ignore[attr-defined]
-
-from planner.llm.gateway import ResolvedModelConfig  # noqa: E402
-
-if not hasattr(_gateway, "LlmConnectionError"):
-    from planner.core.errors import AppError
-
-    class _LlmConnectionError(AppError):
-        """Raised when provider connection test fails."""
-
-        def __init__(self, message: str | None = None) -> None:
-            super().__init__(
-                code="MODEL_CONNECTION_FAILED",
-                message=message or "Could not reach the provider. Check the key and endpoint.",
-                status=422,
-            )
-
-    _gateway.LlmConnectionError = _LlmConnectionError  # type: ignore[attr-defined]
-
-if not hasattr(_gateway, "test_connection"):
-
-    async def _test_connection(config: ResolvedModelConfig) -> int:
-        """Test connection to the provider and return roundtrip latency in ms."""
-        raise NotImplementedError("test_connection is not yet implemented in gateway")
-
-    _gateway.test_connection = _test_connection  # type: ignore[attr-defined]
 
 
 async def get_active_model_config(session: AsyncSession) -> ModelConfig | None:
@@ -78,6 +39,37 @@ async def resolve_llm_config(session: AsyncSession) -> ResolvedModelConfig | Non
     )
 
 
+async def resolve_active_llm_config() -> ResolvedModelConfig | None:
+    """The model the Administrator saved in Model settings (FR-049), else env vars."""
+    async with SessionLocal() as session:
+        config = await resolve_llm_config(session)
+    return config if config is not None else await resolve_env_config()
+
+
+def build_llm_gateway() -> LlmGateway:
+    """The one way pipeline tasks get an LLM gateway: saved config + Redis cache (7-day TTL)."""
+    try:
+        import redis.asyncio as aioredis
+
+        redis_client = aioredis.from_url(
+            settings.redis_url, socket_connect_timeout=1, socket_timeout=2
+        )
+    except Exception:  # no redis package: the cache falls back to memory
+        redis_client = None
+    return LlmGateway(config_resolver=resolve_active_llm_config, cache=LlmCache(redis_client))
+
+
+def describe_llm_outcome(exc: BaseException | None) -> tuple[str, str | None]:
+    """(ai_status, ai_message) for a pipeline step that tried the LLM (Level 3 B2)."""
+    if exc is None:
+        return "used", None
+    code = getattr(exc, "code", None)
+    if code == "LLM_NO_CREDENTIAL":
+        return "off", "No AI model is configured; only deterministic rules were used."
+    message = getattr(exc, "message", None) or f"{type(exc).__name__}: {str(exc)[:200]}"
+    return "failed", f"AI suggestions unavailable ({message}); deterministic rules were used."
+
+
 from planner.modules.model_config.features.get_model_config.router import (  # noqa: E402
     router as get_model_config_router,
 )
@@ -99,4 +91,12 @@ routers = [
     update_model_config_router,
 ]
 
-__all__ = ["get_active_model_config", "resolve_llm_config", "ModelConfig", "routers"]
+__all__ = [
+    "ModelConfig",
+    "build_llm_gateway",
+    "describe_llm_outcome",
+    "get_active_model_config",
+    "resolve_active_llm_config",
+    "resolve_llm_config",
+    "routers",
+]

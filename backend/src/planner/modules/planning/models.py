@@ -42,6 +42,9 @@ class Plan(Base):
     status: Mapped[str] = mapped_column(String(50), default="proposed")
     total_estimated_loss: Mapped[float] = mapped_column(Numeric(6, 3), default=0.0)
     loss_threshold: Mapped[float] = mapped_column(Numeric(6, 3), default=0.05)
+    # Level 3 B2: "used" | "off" | "failed" for AI step proposals, with the reason.
+    ai_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ai_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_by: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -76,6 +79,8 @@ class PlanStep(Base):
     operation: Mapped[str] = mapped_column(String(50))
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON)
     rationale: Mapped[str] = mapped_column(Text)
+    # Level 3 B5: "deterministic" or "llm" (AI-suggested), shown as a tag in plan review.
+    source: Mapped[str] = mapped_column(String(20), default="deterministic")
     confidence: Mapped[float] = mapped_column(Numeric(3, 2))
     decision: Mapped[str] = mapped_column(String(20), default="pending")
     decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

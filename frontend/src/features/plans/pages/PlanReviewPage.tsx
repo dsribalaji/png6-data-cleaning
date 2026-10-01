@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { MSG_PLAN_CONFIDENCE } from "../../../shared/constants/messages";
+import { AiStatusBanner } from "../../../shared/ui/AiStatusBanner";
 import { useNavigate, useParams } from "react-router";
 import { IconAlertTriangle, IconRefresh, IconCircleCheck } from "@tabler/icons-react";
 import type { PlanStep } from "../../../api/schema";
@@ -139,6 +141,8 @@ export function PlanReviewPage() {
           {plan ? (
             <p className="mt-1 text-sm text-[#6c757d] dark:text-[#a0aec0]">
               {totalEstLoss(fractionToPct(plan.totalEstimatedLoss))}
+              {plan.confidence != null &&
+                ` · ${MSG_PLAN_CONFIDENCE(fractionToPct(plan.confidence))}`}
             </p>
           ) : (
             <Skeleton className="mt-1.5 h-4 w-48" />
@@ -168,6 +172,8 @@ export function PlanReviewPage() {
           </Can>
         </div>
       </div>
+
+      <AiStatusBanner status={plan?.aiStatus} message={plan?.aiMessage} />
 
       {overThresholdStep && (
         <div

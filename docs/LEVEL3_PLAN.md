@@ -131,6 +131,20 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
 - Lint debt is too large to gate fully today: 97 B008, 54 blind-except and others (about 300 findings; 57 files not ruff-formatted). CI gates only on undefined names and syntax errors. Ratchet the rest per file.
 - Also fixed: an undefined name in `model_config` (a dead fallback class), and a circular import that made `test_w3_model_config.py` fail when run on its own.
 
+## 4c. M2 progress (2026-10-01)
+
+- **B1 done.** Pipeline tasks get their gateway from `model_config.public.build_llm_gateway()`: the model the Administrator saved in Model settings, otherwise env vars, with the Redis cache. LiteLLM is imported only when a model is actually called; the gateway now imports in 0.8 s, and the API no longer pays a 10–20 s import at boot. Blocking model calls run off the event loop.
+- **B2 done.** Profile runs and plans store `ai_status` ("used" / "off" / "failed") and `ai_message` (migration `0005`). A failure writes an `llm.failed` audit event, and the Profile and Plan review pages show a banner explaining it.
+- **B3 done.** Rules keep `source` and `prompt_version`; the Profile page tags AI rules "AI-suggested".
+- **B4 done.** An AI step enters a plan only if it validates against the schema and its loss estimate dry-runs on the real data. Rejected steps are listed in the plan's `ai_message` (`merge_steps`, unit-tested).
+- **B5 done.** Steps carry `source`; AI steps are tagged in plan review. Steps under 0.6 confidence are never pre-accepted (`default_decision`).
+- **B6 done.** Plans report `confidence`, which is the lowest step confidence (FR-046).
+- **B8 wired, not measured.** The Redis cache is connected; measuring "second run makes 0 model calls" needs a model key.
+- **C4 done.** The injection guard is now one case-insensitive regex. It used to miss 2 of the 3 adversarial cases ("Ignore all previous instructions…", `<|system|>`). Whole-table scans are vectorised (19 ms on 32k rows); flagged cells are stored on the profile run and listed on the Profile page.
+- **C5 done.** XLSX and CSV exports put a leading `'` on formula-like text. openpyxl used to turn text starting with `=` into a live formula.
+- **Found and fixed:** the Profile page never showed inferred rules. The API returns `{items}`, but the frontend treated it as an array, so it always showed "No rules were inferred".
+- **Not yet verified against a real model:** every AI path is covered by unit tests with fakes. An end-to-end run with Groq needs `GROQ_API_KEY` in `.env`, or a key saved in Model settings.
+
 ## 5. Order
 
 Each milestone ends with a tested, working state. The pipeline goes first so that everything after it ships through CI.

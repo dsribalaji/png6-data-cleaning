@@ -66,4 +66,7 @@ async def get_profile(session: AsyncSession, dataset_id: UUID) -> ProfileRespons
         columns=columns,
         issues=run.issues or [],
         profiled_at=run.profiled_at,
+        ai_status=run.ai_status,
+        ai_message=run.ai_message,
+        flagged_cells=run.flagged_cells or [],
     )

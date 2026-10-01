@@ -404,3 +404,16 @@ export const MESSAGES = {
   PREVIOUS: MSG_PREVIOUS,
   NEXT: MSG_NEXT,
 } as const;
+
+// Level 3 M2: AI suggestions and poisoned cells (LEVEL3_PLAN B2, B5, C4)
+export const MSG_AI_OFF =
+  "AI suggestions are off: no AI model is configured, so only deterministic rules were used.";
+export const MSG_AI_FAILED_FALLBACK =
+  "AI suggestions were unavailable; deterministic rules were used.";
+export const MSG_AI_TAG = "AI-suggested";
+export const MSG_AI_TAG_TITLE =
+  "Proposed by the AI model and checked against the data. Review it before accepting.";
+export const MSG_FLAGGED_CELLS_TITLE = "Cells that look like instructions to an AI";
+export const MSG_FLAGGED_CELLS_SUBTITLE =
+  "These cells are kept in the data but are never sent to an AI model.";
+export const MSG_PLAN_CONFIDENCE = (pct: number | string) => `Plan confidence ${pct}%`;

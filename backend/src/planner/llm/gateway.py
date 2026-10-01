@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import pathlib
@@ -10,8 +11,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-import instructor
-import litellm
 import structlog
 from pydantic import BaseModel, ValidationError
 
@@ -93,6 +92,14 @@ def _load_prompt(
     return content
 
 
+def _completion(**kwargs: Any) -> Any:
+    """litellm.completion, imported on first use: litellm takes 10-20 s to import on
+    small machines, so the app only pays for it when a model is actually configured."""
+    import litellm
+
+    return litellm.completion(**kwargs)
+
+
 def _call_model(
     model_id: str,
     messages: list[dict[str, str]],
@@ -101,7 +108,9 @@ def _call_model(
     endpoint_url: str | None,
 ) -> T:
     """Call model using instructor and litellm with structured JSON output."""
-    client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.JSON)
+    import instructor
+
+    client = instructor.from_litellm(_completion, mode=instructor.Mode.JSON)
     kwargs: dict[str, Any] = {
         "model": model_id,
         "messages": messages,
@@ -116,7 +125,7 @@ def _call_model(
     return client.chat.completions.create(**kwargs)  # type: ignore[no-any-return]
 
 
-async def _default_env_resolver() -> ResolvedModelConfig | None:
+async def resolve_env_config() -> ResolvedModelConfig | None:
     """Default config resolver using environment variables."""
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
@@ -155,7 +164,7 @@ async def test_connection(config: ResolvedModelConfig, timeout_s: int = 30) -> f
             kwargs["api_key"] = config.api_key
         if config.endpoint_url is not None:
             kwargs["base_url"] = config.endpoint_url
-        litellm.completion(**kwargs)
+        await asyncio.to_thread(_completion, **kwargs)
         return time.monotonic() - start
     except Exception as exc:
         raise LlmConnectionError() from exc
@@ -169,7 +178,7 @@ class LlmGateway(LlmGatewayPort):
         config_resolver: Callable[[], Awaitable[ResolvedModelConfig | None]] | None = None,
         cache: LlmCache | None = None,
     ) -> None:
-        self._config_resolver = config_resolver or _default_env_resolver
+        self._config_resolver = config_resolver or resolve_env_config
         self._cache = cache if cache is not None else LlmCache()
 
     test_connection = staticmethod(test_connection)
@@ -231,7 +240,9 @@ class LlmGateway(LlmGatewayPort):
 
         # 7. Model invocation with 1 repair retry on ValidationError
         try:
-            result = _call_model(model_id, messages, out, config.api_key, config.endpoint_url)
+            result = await asyncio.to_thread(
+                _call_model, model_id, messages, out, config.api_key, config.endpoint_url
+            )
         except ValidationError as err1:
             failed_content = (
                 getattr(err1, "raw_response", None)
@@ -249,7 +260,9 @@ class LlmGateway(LlmGatewayPort):
                 }
             )
             try:
-                result = _call_model(model_id, messages, out, config.api_key, config.endpoint_url)
+                result = await asyncio.to_thread(
+                    _call_model, model_id, messages, out, config.api_key, config.endpoint_url
+                )
             except ValidationError as err2:
                 raise LlmError(
                     "LLM_UNRELIABLE_OUTPUT",

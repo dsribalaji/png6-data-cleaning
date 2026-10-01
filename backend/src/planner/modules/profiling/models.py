@@ -86,6 +86,11 @@ class ProfileRun(Base):
     row_count: Mapped[int] = mapped_column(Integer)
     column_count: Mapped[int] = mapped_column(Integer)
     issues: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Level 3 B2: "used" | "off" | "failed" for AI rule inference, with the reason.
+    ai_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ai_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # FR-045: cells the injection guard flagged ({column, row, preview, pattern}).
+    flagged_cells: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     profiled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

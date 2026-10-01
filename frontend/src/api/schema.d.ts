@@ -190,10 +190,24 @@ export interface ProfileSummary {
   quarantinedRowsCount: number;
 }
 
+/** "used" = AI suggestions included; "off" = no model configured; "failed" = see aiMessage. */
+export type AiStatus = "used" | "off" | "failed";
+
+/** A cell that looks like an instruction to an AI model (FR-045); never sent to one. */
+export interface FlaggedCell {
+  column: string;
+  row: number;
+  preview: string;
+  reason: string;
+}
+
 export interface DatasetProfile {
   datasetId: string;
   summary: ProfileSummary;
   columns: ColumnProfile[];
+  aiStatus?: AiStatus | null;
+  aiMessage?: string | null;
+  flaggedCells?: FlaggedCell[];
 }
 
 export type InferredRuleType =
@@ -213,6 +227,8 @@ export interface InferredRule {
   confidence: number;
   evidenceRows: Array<Record<string, unknown>>;
   promptVersion?: string;
+  /** "llm" when the rule came from the AI model; anything else is deterministic. */
+  source?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -257,6 +273,8 @@ export interface PlanStep {
   sampleBefore?: Array<Record<string, unknown>>;
   sampleAfter?: Array<Record<string, unknown>>;
   changedColumns?: string[];
+  /** "llm" = AI-suggested step; "deterministic" otherwise. */
+  source?: string;
 }
 
 export interface Plan {
@@ -269,6 +287,10 @@ export interface Plan {
   approvedAt?: string | null;
   createdAt: string;
   steps?: PlanStep[];
+  aiStatus?: AiStatus | null;
+  aiMessage?: string | null;
+  /** FR-046: the lowest step confidence (null when the plan has no steps). */
+  confidence?: number | null;
 }
 
 export interface PlanDetail extends Plan {

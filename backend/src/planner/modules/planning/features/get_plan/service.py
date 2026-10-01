@@ -67,6 +67,7 @@ async def get_plan(session: AsyncSession, plan_id: UUID) -> PlanOut:
                 decision=step.decision,
                 decision_reason=step.decision_reason,
                 estimated_loss=loss_out,
+                source=step.source or "deterministic",
             )
         )
 
@@ -78,4 +79,6 @@ async def get_plan(session: AsyncSession, plan_id: UUID) -> PlanOut:
         loss_threshold=float(plan.loss_threshold),
         steps=steps_out,
         created_at=plan.created_at,
+        ai_status=plan.ai_status,
+        ai_message=plan.ai_message,
     )

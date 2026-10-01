@@ -325,6 +325,9 @@ interface RawProfile {
   columnCount: number;
   quarantinedRowsCount?: number;
   columns: Array<Omit<ColumnProfile, "columnName" | "id" | "datasetId"> & { name: string }>;
+  aiStatus?: DatasetProfile["aiStatus"];
+  aiMessage?: string | null;
+  flaggedCells?: DatasetProfile["flaggedCells"];
 }
 
 /** API → view model: column names, null share 0–1 → percent, summary KPIs derived. */
@@ -340,6 +343,9 @@ export function toDatasetProfile(raw: RawProfile): DatasetProfile {
   return {
     datasetId: raw.datasetId,
     columns,
+    aiStatus: raw.aiStatus ?? null,
+    aiMessage: raw.aiMessage ?? null,
+    flaggedCells: raw.flaggedCells ?? [],
     summary: {
       rowCount: raw.rowCount,
       columnCount: raw.columnCount,
@@ -352,6 +358,22 @@ export function toDatasetProfile(raw: RawProfile): DatasetProfile {
   };
 }
 
+/** GET /datasets/{id}/rules as the API sends it: `{ datasetId, items, total }`. */
+interface RawRules {
+  datasetId: string;
+  items: Array<Omit<Rule, "datasetId" | "evidenceRows"> & { evidence?: Record<string, unknown> }>;
+}
+
+/** API → view model. The API wraps rules in `items` and sends evidence as one object. */
+export function toRules(raw: RawRules | Rule[]): Rule[] {
+  if (Array.isArray(raw)) return raw;
+  return raw.items.map(({ evidence, ...rule }) => ({
+    ...rule,
+    datasetId: raw.datasetId,
+    evidenceRows: evidence && Object.keys(evidence).length > 0 ? [evidence] : [],
+  }));
+}
+
 /** GET /datasets/{id}/rules — rules inferred from the profiled data. */
 export function useRules(
   id: string | undefined,
@@ -359,7 +381,7 @@ export function useRules(
 ) {
   return useQuery<Rule[]>({
     queryKey: datasetKeys.rules(id ?? ""),
-    queryFn: () => api.get(`datasets/${id}/rules`).json<Rule[]>(),
+    queryFn: async () => toRules(await api.get(`datasets/${id}/rules`).json<RawRules>()),
     enabled: Boolean(id),
     ...options,
   });
