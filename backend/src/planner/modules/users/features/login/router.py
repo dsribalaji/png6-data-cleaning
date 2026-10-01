@@ -7,13 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.config import settings
 from planner.core.db import get_session
+from planner.core.ratelimit import rate_limit
 from planner.modules.users.features.login.schemas import LoginRequest, TokenResponse
 from planner.modules.users.features.login.service import login_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(rate_limit("login", lambda: settings.rate_limit_login_per_minute))],
+)
 async def login_endpoint(
     payload: LoginRequest,
     response: Response,
