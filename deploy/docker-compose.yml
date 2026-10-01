@@ -138,6 +138,20 @@ services:
     ports:
       - "3000:3000"
 
+  # D-4 (Level 3): OpenBao secret store, dev mode (in-memory, unsealed, root token).
+  # Only with `--profile secrets`. Load secrets once:
+  #   docker compose -f deploy/docker-compose.yml exec openbao \
+  #     bao kv put secret/png6 JWT_SECRET=... FERNET_KEY=... GROQ_API_KEY=...
+  # then set BAO_ADDR=http://openbao:8200 and BAO_TOKEN in .env. Dev mode loses data
+  # on restart; a real deployment runs OpenBao with storage and unseal keys.
+  openbao:
+    image: openbao/openbao:latest
+    profiles: ["secrets"]
+    command: server -dev -dev-root-token-id=${BAO_DEV_ROOT_TOKEN:-dev-only-root-token} -dev-listen-address=0.0.0.0:8200
+    cap_add: [IPC_LOCK]
+    ports:
+      - "8200:8200"
+
 volumes:
   storage:
   pgdata:

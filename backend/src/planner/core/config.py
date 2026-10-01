@@ -8,6 +8,8 @@ from typing import Literal
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from planner.core.secrets import load_openbao_secrets
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment or .env file."""
@@ -42,6 +44,12 @@ class Settings(BaseSettings):
     n8n_folder_path: str = "./n8n_folder"
     cors_origins: list[str] | str = ["http://localhost:5173"]
     groq_api_key: str | None = None
+    # D-7: requests per client IP per minute; 0 switches a limit off.
+    rate_limit_login_per_minute: int = 20
+    rate_limit_upload_per_minute: int = 10
+    # Header carrying the real client IP when a trusted proxy is in front
+    # (e.g. "cf-connecting-ip" behind Cloudflare); empty = use the socket address.
+    rate_limit_client_header: str = ""
     log_level: str = "INFO"
     environment: str = "local"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
@@ -83,4 +91,6 @@ class Settings(BaseSettings):
         return self.celery_broker_url
 
 
+# D-4: secrets from OpenBao (when BAO_ADDR is set) land in the environment first.
+load_openbao_secrets()
 settings = Settings()
