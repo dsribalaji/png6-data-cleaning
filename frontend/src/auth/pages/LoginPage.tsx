@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isOidc, startOidcLogin } from "../oidc";
 import { useNavigate, useSearchParams } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +10,7 @@ import type { AuthResponse, User } from "../../api/schema";
 import { useSessionStore } from "../session.store";
 import { getRoleLandingRoute } from "../permissions";
 import { MESSAGES } from "../../shared/constants/messages";
+import { Button } from "../../shared/ui/Button";
 
 const loginSchema = z.object({
   email: z
@@ -24,7 +26,7 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export function LoginPage() {
+function PasswordLoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isExpired = searchParams.get("expired") === "1";
@@ -191,6 +193,28 @@ export function LoginPage() {
       </div>
     </div>
   );
+}
+
+/** Under VITE_AUTH_MODE=oidc, sign-in happens on Keycloak's page (password + MFA). */
+function SsoLoginPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#f2f3f7] dark:bg-[#1a1d21] text-[#1f2937] dark:text-[#f3f4f6]">
+      <div className="w-full max-w-md bg-white dark:bg-[#24282e] rounded-lg border border-[#e9ecef] dark:border-[#343a40] p-8 shadow-sm text-center">
+        <h1 className="text-2xl font-bold tracking-tight">Data Cleaning Planner</h1>
+        <p className="text-sm text-[#6c757d] dark:text-[#a0aec0] mt-1 mb-6">
+          Sign in with your organisation account. You will be asked for a code from your
+          authenticator app.
+        </p>
+        <Button className="w-full" onClick={() => void startOidcLogin()}>
+          Sign in with SSO
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function LoginPage() {
+  return isOidc ? <SsoLoginPage /> : <PasswordLoginPage />;
 }
 
 export default LoginPage;

@@ -1,5 +1,6 @@
 import ky from "ky";
 import { useSessionStore } from "../auth/session.store";
+import { isOidc, refreshOidcToken } from "../auth/oidc";
 
 export interface ProblemDetail {
   type?: string;
@@ -39,6 +40,14 @@ async function refreshAccessToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
+      if (isOidc) {
+        // SSO: renew with Keycloak's refresh token (memory only), not the API cookie.
+        const token = await refreshOidcToken();
+        if (!token) throw new Error("SSO session ended");
+        const currentUser = useSessionStore.getState().user;
+        if (currentUser) useSessionStore.getState().setSession(token, currentUser);
+        return token;
+      }
       const response = await ky.post(`${API_ORIGIN}/api/v1/auth/refresh`, {
         headers: {
           "X-Requested-With": "XMLHttpRequest",

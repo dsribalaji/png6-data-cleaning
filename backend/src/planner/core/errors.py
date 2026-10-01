@@ -24,6 +24,7 @@ ERROR_CATALOGUE: dict[str, tuple[int, str]] = {
     "NOT_FOUND": (404, "The requested resource was not found."),
     "FORBIDDEN": (403, "You don't have access to this page."),
     "VALIDATION_ERROR": (422, "Request validation failed."),
+    "SSO_REQUIRED": (403, "Sign in with single sign-on."),
     "RATE_LIMITED": (429, "Too many requests. Wait a minute and try again."),
     "INTERNAL": (500, "An unexpected error occurred."),
 }

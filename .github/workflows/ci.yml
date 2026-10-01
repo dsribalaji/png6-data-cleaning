@@ -158,6 +158,58 @@ jobs:
             walkthrough/
             compose.log
 
+  sso:
+    # Level 3 D-2: the stack in AUTH_MODE=oidc with Keycloak (compose profile `sso`).
+    # Proves Keycloak tokens are accepted, roles are enforced, password sign-in is
+    # refused and demo users must set up MFA (scripts/sso_smoke.py).
+    runs-on: ubuntu-latest
+    needs: [backend]
+    env:
+      # Compose interpolates ${KEYCLOAK_ADMIN_PASSWORD} from the shell environment.
+      KEYCLOAK_ADMIN_PASSWORD: ci-only-keycloak-admin
+    steps:
+      - uses: actions/checkout@v4
+      - name: .env for SSO
+        run: |
+          cp .env.example .env
+          sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env
+          # OIDC_ISSUER / OIDC_JWKS_URL defaults in .env.example already point at the stack.
+          sed -i "s/^AUTH_MODE=.*/AUTH_MODE=oidc/" .env
+          grep -E "^(AUTH_MODE|OIDC_ISSUER|OIDC_JWKS_URL)=" .env
+      - name: start the stack with Keycloak
+        run: |
+          docker compose -f deploy/docker-compose.yml --profile sso up -d --build \
+            postgres redis rabbitmq minio keycloak api worker beat
+          timeout 300 bash -c 'until curl -sf localhost:8000/api/v1/health/live; do sleep 3; done'
+          timeout 300 bash -c 'until curl -sf localhost:8080/realms/png6/.well-known/openid-configuration >/dev/null; do sleep 3; done'
+      - name: CI-only client and users (password grant; never in the realm file)
+        run: |
+          kc() { docker compose -f deploy/docker-compose.yml exec -T keycloak /opt/keycloak/bin/kcadm.sh "$@"; }
+          kc config credentials --server http://localhost:8080 --realm master --user admin --password "$KEYCLOAK_ADMIN_PASSWORD"
+          kc create clients -r png6 -s clientId=png6-ci -s publicClient=true -s directAccessGrantsEnabled=true -s standardFlowEnabled=false
+          for spec in "ci-engineer:CiEngineer123!:data_engineer" "ci-viewer:CiViewer1234!:viewer"; do
+            IFS=: read -r u pw role <<< "$spec"
+            kc create users -r png6 -s username=$u -s enabled=true -s email=$u@example.com -s emailVerified=true -s firstName=Ci -s lastName=User
+            kc set-password -r png6 --username $u --new-password "$pw"
+            kc add-roles -r png6 --uusername $u --rolename $role
+            # CI users skip the default "configure OTP" action (a password grant cannot
+            # do MFA); the demo users in the realm file keep it.
+            id=$(kc get users -r png6 -q username=$u --fields id --format csv --noquotes)
+            kc update users/$id -r png6 -s 'requiredActions=[]'
+          done
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: SSO smoke test
+        run: uv run --with httpx python backend/scripts/sso_smoke.py
+      - if: always()
+        run: docker compose -f deploy/docker-compose.yml logs api keycloak > sso.log 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sso
+          path: sso.log
+
   image:
     # One image per commit (api, worker and beat all run it), scanned before publishing.
     runs-on: ubuntu-latest

@@ -5,6 +5,7 @@ import {
   redirect,
 } from "react-router";
 import { useSessionStore } from "../auth/session.store";
+import { OidcCallbackPage } from "../auth/pages/OidcCallbackPage";
 import {
   type Permission,
   hasPermission,
@@ -171,6 +172,10 @@ export const router = createBrowserRouter([
         <LoginPage />
       </Suspense>
     ),
+  },
+  {
+    path: "/auth/callback",
+    element: <OidcCallbackPage />,
   },
   {
     path: "/invite/:token",

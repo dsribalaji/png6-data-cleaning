@@ -9,6 +9,12 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+# Sign-in mode is fixed at build time (Vite inlines VITE_*): local by default, or
+# Keycloak SSO with VITE_AUTH_MODE=oidc (see docs/DEPLOYMENT.md, "SSO + MFA").
+ARG VITE_AUTH_MODE=local
+ARG VITE_OIDC_ISSUER=http://localhost:8080/realms/png6
+ARG VITE_OIDC_CLIENT_ID=png6-web
+ENV VITE_AUTH_MODE=$VITE_AUTH_MODE VITE_OIDC_ISSUER=$VITE_OIDC_ISSUER VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
 RUN npm run build
 
 EXPOSE 5173
