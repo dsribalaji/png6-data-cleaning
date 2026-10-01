@@ -35,6 +35,7 @@ import {
   datasetNameSchema,
   type UploadFormValues,
 } from "../schemas";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 export interface UploadDatasetModalProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export interface UploadDatasetModalProps {
  * upload affordance at all (hidden, not disabled — PRD Section 2 RBAC rule).
  */
 export function UploadDatasetModal({ isOpen, onClose }: UploadDatasetModalProps) {
+  const shouldReduceMotion = useReducedMotion();
   const canUpload = usePermission("dataset.upload");
   const { data: uploadConfig } = useUploadConfig();
   const uploadMutation = useUploadDataset();
@@ -182,7 +184,7 @@ export function UploadDatasetModal({ isOpen, onClose }: UploadDatasetModalProps)
         {formError && (
           <div
             role="alert"
-            className="rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-3 py-2 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+            className="rounded-[10px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
           >
             {formError}
           </div>
@@ -257,31 +259,39 @@ export function UploadDatasetModal({ isOpen, onClose }: UploadDatasetModalProps)
           })}
         />
 
-        {isPending && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-[#6c757d] dark:text-[#a0aec0]">
-              <span>Uploading…</span>
-              <span className="tabular-nums">{progress}%</span>
-            </div>
-            <div
-              role="progressbar"
-              aria-label={MSG_UPLOAD_PROGRESS}
-              aria-valuenow={progress}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-2 w-full overflow-hidden rounded-full bg-[#e9ecef] dark:bg-[#343a40]"
+        <AnimatePresence>
+          {isPending && (
+            <motion.div
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={shouldReduceMotion ? undefined : { opacity: 0, y: 6 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="space-y-1.5"
             >
+              <div className="flex items-center justify-between text-xs text-[#6c757d] dark:text-[#a0aec0]">
+                <span>Uploading…</span>
+                <span className="tabular-nums">{progress}%</span>
+              </div>
               <div
-                className="h-full rounded-full bg-[#fd6321] transition-[width] duration-200"
-                style={{ width: `${Math.max(2, progress)}%` }}
-              />
-            </div>
-            <p className="text-xs text-[#6c757d] dark:text-[#a0aec0]">
-              The profile starts as soon as the file arrives. The row keeps
-              updating even if you leave this page.
-            </p>
-          </div>
-        )}
+                role="progressbar"
+                aria-label={MSG_UPLOAD_PROGRESS}
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="h-2 w-full overflow-hidden rounded-full bg-line/50 dark:bg-[#343a40]"
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-200"
+                  style={{ width: `${Math.max(2, progress)}%` }}
+                />
+              </div>
+              <p className="text-xs text-[#6c757d] dark:text-[#a0aec0]">
+                The profile starts as soon as the file arrives. The row keeps
+                updating even if you leave this page.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Lets Enter inside the name field submit the form; the visible
             action lives in the modal footer. */}

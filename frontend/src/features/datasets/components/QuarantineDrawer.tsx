@@ -70,7 +70,7 @@ export function QuarantineDrawer({
           ))}
         </div>
       ) : isError ? (
-        <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-sm text-danger dark:text-rose-400">
           The quarantined rows could not be loaded.
         </p>
       ) : items.length === 0 ? (
@@ -78,8 +78,8 @@ export function QuarantineDrawer({
       ) : (
         <>
           <table className="w-full border-collapse text-left text-sm">
-            <thead className="text-xs uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]">
-              <tr className="border-b border-[#e9ecef] dark:border-[#343a40]">
+            <thead className="text-xs uppercase tracking-wider text-ink2 dark:text-[#a0aec0]">
+              <tr className="border-b border-line dark:border-[#343a40]">
                 <th scope="col" className="py-2 pr-3 font-semibold">
                   {ROW_REF_LABEL}
                 </th>
@@ -88,13 +88,13 @@ export function QuarantineDrawer({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e9ecef] dark:divide-[#343a40]">
+            <tbody className="divide-y divide-line dark:divide-[#343a40]">
               {items.map((row) => (
                 <tr key={row.id}>
-                  <td className="py-2.5 pr-3 align-top tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+                  <td className="py-2.5 pr-3 align-top tabular-nums text-ink dark:text-[#f3f4f6]">
                     {row.rowRef}
                   </td>
-                  <td className="py-2.5 align-top text-[#1f2937] dark:text-[#f3f4f6]">
+                  <td className="py-2.5 align-top text-ink dark:text-[#f3f4f6]">
                     {row.reason}
                   </td>
                 </tr>
@@ -105,7 +105,7 @@ export function QuarantineDrawer({
           {totalPages > 1 && (
             <nav
               aria-label="Quarantined rows pagination"
-              className="mt-4 flex items-center justify-between gap-2 text-xs text-[#6c757d] dark:text-[#a0aec0]"
+              className="mt-4 flex items-center justify-between gap-2 text-xs text-ink2 dark:text-[#a0aec0]"
             >
               <Button
                 variant="secondary"

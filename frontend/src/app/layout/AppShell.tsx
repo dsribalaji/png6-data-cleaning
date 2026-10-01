@@ -119,23 +119,18 @@ export function AppShell() {
   const roleInfo = user?.role ? ROLE_LABELS[user.role] : undefined;
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#f2f3f7] dark:bg-[#1a1d21] text-[#1f2937] dark:text-[#f3f4f6]">
+    <div className="flex h-screen w-full overflow-hidden bg-canvas dark:bg-[#1a1d21] text-ink dark:text-[#f3f4f6]">
       {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col bg-white dark:bg-[#1f2327] border-r border-[#e9ecef] dark:border-[#343a40] z-20">
+      <aside className="w-64 flex-shrink-0 flex flex-col bg-surface dark:bg-[#1f2327] border-r border-line dark:border-[#343a40] z-20">
         {/* Brand header */}
-        <div className="h-16 flex items-center px-6 border-b border-[#e9ecef] dark:border-[#343a40]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#fd6321] text-white font-bold text-lg shadow-sm">
-              P
-            </div>
-            <div>
-              <h1 className="text-sm font-bold text-[#1f2937] dark:text-[#f3f4f6] leading-tight">
-                Data Cleaning
-              </h1>
-              <p className="text-[11px] font-medium text-[#6c757d] dark:text-[#a0aec0] uppercase tracking-wider">
-                Planner
-              </p>
-            </div>
+        <div className="h-16 flex items-center px-6 border-b border-line dark:border-[#343a40]">
+          <div>
+            <h1 className="text-base font-bold text-ink dark:text-[#f3f4f6] tracking-wide leading-tight">
+              TITAN
+            </h1>
+            <p className="text-xs text-ink2 dark:text-[#a0aec0]">
+              Data Cleaning
+            </p>
           </div>
         </div>
 
@@ -145,12 +140,6 @@ export function AppShell() {
             <SidebarItem key={item.path} item={item} />
           ))}
         </nav>
-
-        {/* Sidebar footer: workspace version or minimal info */}
-        <div className="p-4 border-t border-[#e9ecef] dark:border-[#343a40] text-[11px] text-[#6c757d] dark:text-[#a0aec0] flex items-center justify-between">
-          <span>PNG6 Planner v0.1</span>
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Connected" />
-        </div>
       </aside>
 
       {/* Main Column */}
@@ -167,7 +156,7 @@ export function AppShell() {
         )}
 
         {/* Top Header */}
-        <header className="h-16 flex-shrink-0 bg-white dark:bg-[#24282e] border-b border-[#e9ecef] dark:border-[#343a40] flex items-center justify-between px-6 z-10">
+        <header className="h-16 flex-shrink-0 bg-surface dark:bg-[#24282e] border-b border-line dark:border-[#343a40] flex items-center justify-between px-6 z-10">
           <div className="flex items-center gap-4">
             {/* Title / context can be augmented by routes */}
           </div>
@@ -177,7 +166,7 @@ export function AppShell() {
             {user && (
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="text-xs font-bold text-[#1f2937] dark:text-[#f3f4f6]">
+                  <p className="text-xs font-bold text-ink dark:text-[#f3f4f6]">
                     {user.name || user.email}
                   </p>
                   {roleInfo && (
@@ -186,13 +175,13 @@ export function AppShell() {
                     </div>
                   )}
                 </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fde8e4] dark:bg-[#3d2420] text-[#fd6321] font-bold text-xs uppercase border border-[#fd6321]/20">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 dark:bg-[#3d2420] text-primary font-bold text-xs uppercase border border-primary/20">
                   {(user.name || user.email).charAt(0)}
                 </div>
               </div>
             )}
 
-            <div className="h-6 w-px bg-[#e9ecef] dark:bg-[#343a40]" />
+            <div className="h-6 w-px bg-line dark:bg-[#343a40]" />
 
             <Button
               variant="ghost"
@@ -200,7 +189,7 @@ export function AppShell() {
               loading={isLoggingOut}
               onClick={handleSignOut}
               leftIcon={<IconLogout className="h-4 w-4" aria-hidden="true" />}
-              className="text-[#6c757d] hover:text-[#dc3545] dark:text-[#a0aec0] dark:hover:text-[#dc3545]"
+              className="text-ink2 hover:text-danger dark:text-[#a0aec0] dark:hover:text-[#dc3545]"
             >
               {MESSAGES.SIGN_OUT}
             </Button>
@@ -208,7 +197,7 @@ export function AppShell() {
         </header>
 
         {/* Page Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-6 bg-[#f2f3f7] dark:bg-[#1a1d21]">
+        <main className="flex-1 overflow-y-auto p-6 bg-canvas dark:bg-[#1a1d21]">
           <Outlet />
         </main>
       </div>
@@ -233,8 +222,8 @@ function SidebarItem({ item }: { item: NavItem }) {
         cx(
           "flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors select-none",
           isActive
-            ? "bg-[#fd6321] text-white shadow-sm"
-            : "text-[#495057] dark:text-[#cbd5e1] hover:bg-[#f2f3f7] dark:hover:bg-[#2d3239] hover:text-[#1f2937] dark:hover:text-[#f3f4f6]"
+            ? "bg-primary text-white shadow-sm"
+            : "text-ink2 dark:text-[#cbd5e1] hover:bg-canvas dark:hover:bg-[#2d3239] hover:text-ink dark:hover:text-[#f3f4f6]"
         )
       }
     >

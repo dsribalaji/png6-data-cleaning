@@ -10,19 +10,19 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  info: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800",
-  warning: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800",
-  success: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800",
-  danger: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800",
-  secondary: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
+  info: "bg-[#DBEAFE] text-blue-700 border-[#BFDBFE] dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800",
+  warning: "bg-[#FEF3C7] text-amber-700 border-[#FDE68A] dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800",
+  success: "bg-[#DCFCE7] text-emerald-700 border-[#BBF7D0] dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800",
+  danger: "bg-[#FEE2E2] text-rose-700 border-[#FECACA] dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800",
+  secondary: "bg-[#F1F5F9] text-gray-700 border-[#E2E8F0] dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
 };
 
 const dotColors: Record<BadgeVariant, string> = {
-  info: "bg-blue-500 dark:bg-blue-400",
-  warning: "bg-amber-500 dark:bg-amber-400",
-  success: "bg-emerald-500 dark:bg-emerald-400",
-  danger: "bg-rose-500 dark:bg-rose-400",
-  secondary: "bg-gray-500 dark:bg-gray-400",
+  info: "bg-info dark:bg-blue-400",
+  warning: "bg-warning dark:bg-amber-400",
+  success: "bg-success dark:bg-emerald-400",
+  danger: "bg-danger dark:bg-rose-400",
+  secondary: "bg-muted dark:bg-gray-400",
 };
 
 /**

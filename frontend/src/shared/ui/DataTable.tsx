@@ -15,6 +15,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
 } from "@tabler/icons-react";
+import { motion, useReducedMotion } from "motion/react";
 import { cx } from "../lib/format";
 import { Skeleton } from "./Skeleton";
 import { EmptyState } from "./EmptyState";
@@ -53,6 +54,7 @@ export function DataTable<TData>({
     pageSize,
   });
 
+  const shouldReduceMotion = useReducedMotion();
   const tableData = useMemo(() => data, [data]);
 
   const table = useReactTable({
@@ -77,13 +79,13 @@ export function DataTable<TData>({
   return (
     <div
       className={cx(
-        "w-full overflow-hidden rounded-lg border border-[#e9ecef] dark:border-[#343a40] bg-white dark:bg-[#24282e] shadow-sm transition-colors",
+        "w-full overflow-hidden rounded-[10px] border border-line dark:border-[#343a40] bg-surface dark:bg-[#24282e] shadow-sm transition-colors",
         className
       )}
     >
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm border-collapse">
-          <thead className="bg-[#f8f9fa] dark:bg-[#1f2327] text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0] border-b border-[#e9ecef] dark:border-[#343a40]">
+          <thead className="bg-canvas dark:bg-[#1f2327] text-xs font-semibold uppercase tracking-wider text-ink2 dark:text-[#a0aec0] border-b border-line dark:border-[#343a40]">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -108,7 +110,7 @@ export function DataTable<TData>({
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
                           className={cx(
-                            "inline-flex items-center gap-1.5 hover:text-[#1f2937] dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#fd6321] rounded",
+                            "inline-flex items-center gap-1.5 hover:text-ink dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded",
                             isNumeric && "flex-row-reverse"
                           )}
                           title={`Sort by ${String(header.column.columnDef.header || "")}`}
@@ -119,7 +121,7 @@ export function DataTable<TData>({
                               header.getContext()
                             )}
                           </span>
-                          <span className="flex-shrink-0 text-[#6c757d] dark:text-[#a0aec0]">
+                          <span className="flex-shrink-0 text-ink2 dark:text-[#a0aec0]">
                             {sorted === "asc" ? (
                               <IconChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
                             ) : sorted === "desc" ? (
@@ -144,7 +146,7 @@ export function DataTable<TData>({
             ))}
           </thead>
 
-          <tbody className="divide-y divide-[#e9ecef] dark:divide-[#343a40] text-[#1f2937] dark:text-[#f3f4f6]">
+          <tbody className="divide-y divide-line dark:divide-[#343a40] text-ink dark:text-[#f3f4f6]">
             {loading ? (
               Array.from({ length: Math.min(pageSize, 5) }).map((_, rIndex) => (
                 <tr key={`loading-row-${rIndex}`} className="animate-pulse">
@@ -162,12 +164,19 @@ export function DataTable<TData>({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr
+              rows.map((row, index) => (
+                <motion.tr
                   key={row.id}
+                  initial={shouldReduceMotion ? false : { opacity: 0, y: 4 }}
+                  animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+                  transition={
+                    shouldReduceMotion
+                      ? undefined
+                      : { delay: index * 0.04, duration: 0.22, ease: "easeOut" }
+                  }
                   onClick={() => onRowClick?.(row.original)}
                   className={cx(
-                    "hover:bg-[#f8f9fa] dark:hover:bg-[#2d3239] transition-colors",
+                    "hover:bg-canvas dark:hover:bg-[#2d3239] transition-colors",
                     onRowClick && "cursor-pointer"
                   )}
                 >
@@ -188,7 +197,7 @@ export function DataTable<TData>({
                       </td>
                     );
                   })}
-                </tr>
+                </motion.tr>
               ))
             )}
           </tbody>
@@ -197,18 +206,18 @@ export function DataTable<TData>({
 
       {/* Pagination Bar */}
       {!loading && totalRows > pageSize && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-[#e9ecef] dark:border-[#343a40] bg-[#f8f9fa]/50 dark:bg-[#1f2327]/30 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-line dark:border-[#343a40] bg-canvas/50 dark:bg-[#1f2327]/30 text-xs text-ink2 dark:text-[#a0aec0]">
           <div>
             Showing{" "}
-            <span className="font-semibold text-[#1f2937] dark:text-[#f3f4f6]">
+            <span className="font-semibold text-ink dark:text-[#f3f4f6]">
               {pageIndex * pageSize + 1}
             </span>{" "}
             to{" "}
-            <span className="font-semibold text-[#1f2937] dark:text-[#f3f4f6]">
+            <span className="font-semibold text-ink dark:text-[#f3f4f6]">
               {Math.min((pageIndex + 1) * pageSize, totalRows)}
             </span>{" "}
             of{" "}
-            <span className="font-semibold text-[#1f2937] dark:text-[#f3f4f6]">
+            <span className="font-semibold text-ink dark:text-[#f3f4f6]">
               {totalRows}
             </span>{" "}
             entries

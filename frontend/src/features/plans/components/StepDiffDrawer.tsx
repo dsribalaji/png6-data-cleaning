@@ -10,6 +10,7 @@ import {
   getStepLossEstimate,
   isStepOverThreshold,
 } from "../api";
+import { isNeverAutoStep } from "./StepTable";
 
 const MAX_SAMPLE_ROWS = 5;
 
@@ -46,9 +47,9 @@ export interface StepDiffDrawerProps {
 }
 
 /**
- * Right-hand drawer for a single step (wireframe 1g): why the model proposed it,
- * how confident it was, what the data looks like before and after, and how much
- * of the dataset the step is estimated to destroy.
+ * Right-hand drawer for a single step (wireframe 1g, preview.html spec):
+ * rationale, confidence, estimated loss, before/after diff samples, and
+ * human approval tags.
  */
 export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerProps) {
   const isOpen = Boolean(step);
@@ -73,6 +74,7 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
   const barScale = Math.max(lossPct, thresholdPct * 2, 0.01);
   const changedColumns = step.changedColumns ?? [];
   const hasSamples = diff.columns.length > 0;
+  const isNeverAuto = isNeverAutoStep(step);
 
   return (
     <Drawer
@@ -82,27 +84,34 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
       title={describeStep(step)}
       subtitle={`Step ${step.stepNo} · ${step.operation.replace(/_/g, " ")}`}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 text-ink">
         <section aria-labelledby="drawer-rationale">
           <h4
             id="drawer-rationale"
-            className="text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]"
+            className="text-xs font-semibold uppercase tracking-wider text-ink2"
           >
             Rationale
           </h4>
-          <p className="mt-1.5 text-sm text-[#1f2937] dark:text-[#f3f4f6] leading-relaxed">
+          <p className="mt-1.5 text-sm text-ink leading-relaxed">
             {step.rationale}
           </p>
+          {isNeverAuto && (
+            <div className="mt-2.5">
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-warning">
+                NEVER auto-approved — human decision required
+              </span>
+            </div>
+          )}
         </section>
 
         <section aria-labelledby="drawer-confidence">
           <h4
             id="drawer-confidence"
-            className="text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]"
+            className="text-xs font-semibold uppercase tracking-wider text-ink2"
           >
             Confidence
           </h4>
-          <p className="mt-1.5 text-sm font-semibold text-[#1f2937] dark:text-[#f3f4f6] tabular-nums">
+          <p className="mt-1.5 text-sm font-semibold tabular-nums text-ink">
             {formatPct2dp(fractionToPct(step.confidence))}
           </p>
         </section>
@@ -110,38 +119,36 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
         <section aria-labelledby="drawer-loss">
           <h4
             id="drawer-loss"
-            className="text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]"
+            className="text-xs font-semibold uppercase tracking-wider text-ink2"
           >
             Estimated loss
           </h4>
-          <p className="mt-1.5 text-sm text-[#1f2937] dark:text-[#f3f4f6] tabular-nums">
+          <p className="mt-1.5 text-sm tabular-nums text-ink">
             {formatPct2dp(lossPct)} of cells
           </p>
 
           <div className="mt-3">
             <div
-              className="relative h-2.5 w-full overflow-hidden rounded-full bg-[#e9ecef] dark:bg-[#343a40]"
+              className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
               role="img"
               aria-label={`Estimated loss ${formatPct2dp(lossPct)} of cells against a threshold of ${formatPct2dp(thresholdPct)}`}
             >
               <div
                 className={cx(
-                  "absolute inset-y-0 left-0 rounded-full",
-                  overThreshold
-                    ? "bg-rose-500 dark:bg-rose-400"
-                    : "bg-[#fd6321]"
+                  "absolute inset-y-0 left-0 rounded-full transition-all duration-300",
+                  overThreshold ? "bg-danger" : "bg-primary"
                 )}
                 style={{ width: `${Math.min(100, (lossPct / barScale) * 100)}%` }}
               />
               {thresholdPct > 0 && (
                 <div
-                  className="absolute inset-y-0 w-0.5 bg-[#1f2937] dark:bg-white"
+                  className="absolute inset-y-0 w-0.5 bg-ink"
                   style={{ left: `${Math.min(100, (thresholdPct / barScale) * 100)}%` }}
                   aria-hidden="true"
                 />
               )}
             </div>
-            <p className="mt-1.5 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+            <p className="mt-1.5 text-xs text-ink2">
               Loss threshold: {formatPct2dp(thresholdPct)} of cells
             </p>
           </div>
@@ -154,12 +161,12 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-md border border-[#e9ecef] dark:border-[#343a40] bg-[#f8f9fa] dark:bg-[#1f2327] px-3 py-2"
+                className="rounded-lg border border-line bg-canvas px-3 py-2"
               >
-                <dt className="text-[11px] font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]">
+                <dt className="text-[11px] font-semibold uppercase tracking-wider text-ink2">
                   {item.label}
                 </dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">
                   {formatInt(item.value)}
                 </dd>
               </div>
@@ -170,7 +177,7 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
         <section aria-labelledby="drawer-sample">
           <h4
             id="drawer-sample"
-            className="text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]"
+            className="text-xs font-semibold uppercase tracking-wider text-ink2"
           >
             Sample before and after
           </h4>
@@ -182,12 +189,12 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
             />
           ) : (
             <>
-              <p className="mt-1.5 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+              <p className="mt-1.5 text-xs text-ink2">
                 Up to {MAX_SAMPLE_ROWS} rows. Changed cells are highlighted.
               </p>
-              <div className="mt-2 overflow-x-auto rounded-lg border border-[#e9ecef] dark:border-[#343a40]">
+              <div className="mt-2 overflow-x-auto rounded-lg border border-line bg-surface">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-[#f8f9fa] dark:bg-[#1f2327] text-[#6c757d] dark:text-[#a0aec0] border-b border-[#e9ecef] dark:border-[#343a40]">
+                  <thead className="border-b border-line bg-canvas text-ink2">
                     <tr>
                       <th scope="col" className="px-3 py-2.5 font-semibold uppercase tracking-wider">
                         Version
@@ -203,12 +210,12 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#e9ecef] dark:divide-[#343a40] text-[#1f2937] dark:text-[#f3f4f6]">
+                  <tbody className="divide-y divide-line text-ink">
                     {diff.before.map((row, index) => (
                       <tr key={`before-${index}`}>
                         <th
                           scope="row"
-                          className="px-3 py-2 font-semibold text-[#6c757d] dark:text-[#a0aec0] whitespace-nowrap"
+                          className="px-3 py-2 font-semibold text-ink2 whitespace-nowrap"
                         >
                           Before
                         </th>
@@ -223,7 +230,7 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
                       <tr key={`after-${index}`}>
                         <th
                           scope="row"
-                          className="px-3 py-2 font-semibold text-[#6c757d] dark:text-[#a0aec0] whitespace-nowrap"
+                          className="px-3 py-2 font-semibold text-ink2 whitespace-nowrap"
                         >
                           After
                         </th>
@@ -260,3 +267,5 @@ export function StepDiffDrawer({ step, lossThreshold, onClose }: StepDiffDrawerP
     </Drawer>
   );
 }
+
+export default StepDiffDrawer;

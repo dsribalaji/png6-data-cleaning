@@ -24,21 +24,21 @@ export function Card({
   return (
     <div
       className={cx(
-        "bg-white dark:bg-[#24282e] rounded-lg border border-[#e9ecef] dark:border-[#343a40] shadow-sm text-[#1f2937] dark:text-[#f3f4f6] transition-colors",
+        "bg-surface dark:bg-[#24282e] rounded-[10px] border border-line dark:border-[#343a40] shadow-sm text-ink dark:text-[#f3f4f6] hover:-translate-y-px transition-transform",
         className
       )}
       {...props}
     >
       {hasHeader && (
-        <div className="flex items-center justify-between border-b border-[#e9ecef] dark:border-[#343a40] px-5 py-4">
+        <div className="flex items-center justify-between border-b border-line dark:border-[#343a40] px-5 py-4">
           <div>
             {title && (
-              <h3 className="text-base font-semibold text-[#1f2937] dark:text-[#f3f4f6]">
+              <h3 className="text-base font-semibold text-ink dark:text-[#f3f4f6]">
                 {title}
               </h3>
             )}
             {subtitle && (
-              <p className="mt-0.5 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+              <p className="mt-0.5 text-xs text-ink2 dark:text-[#a0aec0]">
                 {subtitle}
               </p>
             )}
@@ -50,7 +50,7 @@ export function Card({
       <div className={cx(!noPadding && "p-5")}>{children}</div>
 
       {footer && (
-        <div className="border-t border-[#e9ecef] dark:border-[#343a40] px-5 py-3 bg-[#f8f9fa] dark:bg-[#1f2327] rounded-b-lg">
+        <div className="border-t border-line dark:border-[#343a40] px-5 py-3 bg-canvas dark:bg-[#1f2327] rounded-b-[10px]">
           {footer}
         </div>
       )}

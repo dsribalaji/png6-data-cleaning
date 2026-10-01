@@ -52,7 +52,7 @@ export interface AuditFiltersProps {
 }
 
 /**
- * S9 filter bar (PRD Section 7, wireframe 1l).
+ * S9 filter bar (PRD Section 7, wireframe 1l, preview.html spec).
  *
  * Controlled: the owning page holds the state and keeps it mirrored in the URL
  * query, so a filtered audit trail can be shared as a link.
@@ -106,7 +106,7 @@ export function AuditFilters({
   );
 
   return (
-    <div className="rounded-lg border border-[#e9ecef] bg-white p-4 dark:border-[#343a40] dark:bg-[#24282e]">
+    <div className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm transition-transform hover:-translate-y-px">
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-full max-w-[11rem]">
           <Input
@@ -137,10 +137,9 @@ export function AuditFilters({
           />
         </div>
 
-        {/* Event type multi-select. A checkbox list keeps it keyboard reachable,
-            which a native multiple select is not. */}
+        {/* Event type multi-select */}
         <div className="relative w-full max-w-[14rem]" ref={panelRef}>
-          <span className="mb-1.5 block text-xs font-semibold text-[#1f2937] dark:text-[#f3f4f6]">
+          <span className="mb-1.5 block text-xs font-semibold text-ink">
             {MSG_EVENT_TYPE}
           </span>
           <button
@@ -150,9 +149,9 @@ export function AuditFilters({
             aria-haspopup="true"
             aria-expanded={isEventPanelOpen}
             className={cx(
-              "flex w-full items-center justify-between gap-2 rounded-md border px-3.5 py-2 text-sm shadow-sm transition-colors",
-              "bg-white text-[#1f2937] dark:bg-[#1a1d21] dark:text-[#f3f4f6]",
-              "border-[#d1d5db] dark:border-[#374151] focus:outline-none focus:ring-1 focus:ring-[#fd6321]",
+              "flex w-full items-center justify-between gap-2 rounded-lg border px-3.5 py-2 text-sm shadow-sm transition-colors",
+              "bg-surface text-ink",
+              "border-line focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary",
               "disabled:cursor-not-allowed disabled:opacity-60"
             )}
           >
@@ -163,7 +162,7 @@ export function AuditFilters({
             </span>
             <IconChevronDown
               className={cx(
-                "h-4 w-4 flex-shrink-0 text-[#6c757d] transition-transform dark:text-[#a0aec0]",
+                "h-4 w-4 flex-shrink-0 text-ink2 transition-transform",
                 isEventPanelOpen && "rotate-180"
               )}
               aria-hidden="true"
@@ -171,7 +170,7 @@ export function AuditFilters({
           </button>
 
           {isEventPanelOpen && (
-            <div className="absolute left-0 z-20 mt-1 w-64 rounded-md border border-[#e9ecef] bg-white py-2 shadow-lg dark:border-[#343a40] dark:bg-[#24282e]">
+            <div className="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-line bg-surface py-2 shadow-lg">
               <fieldset className="max-h-64 overflow-y-auto px-3">
                 <legend className="sr-only">{MSG_EVENT_TYPE}</legend>
                 {AUDIT_EVENT_TYPES.map((eventType) => {
@@ -181,14 +180,14 @@ export function AuditFilters({
                     <label
                       key={eventType}
                       htmlFor={id}
-                      className="flex cursor-pointer items-center gap-2.5 rounded px-1 py-1.5 text-sm text-[#1f2937] hover:bg-[#f8f9fa] dark:text-[#f3f4f6] dark:hover:bg-[#2d3239]"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-canvas"
                     >
                       <input
                         id={id}
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleEventType(eventType)}
-                        className="h-4 w-4 rounded border-[#d1d5db] text-[#fd6321] focus:ring-2 focus:ring-[#fd6321] dark:border-[#374151] dark:bg-[#1a1d21]"
+                        className="h-4 w-4 rounded border-line text-primary focus:ring-2 focus:ring-primary"
                       />
                       <span className="font-mono text-xs">{eventType}</span>
                     </label>
@@ -252,7 +251,7 @@ export function AuditFilters({
                     onClick={() => toggleEventType(eventType)}
                     disabled={disabled}
                     aria-label={MSG_REMOVE_EVENT_TYPE_FILTER(eventType)}
-                    className="ml-1 rounded p-0.5 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321] dark:hover:bg-blue-900/60"
+                    className="ml-1 rounded p-0.5 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-blue-900/60"
                   >
                     <IconX className="h-3 w-3" aria-hidden="true" />
                   </button>
@@ -264,7 +263,7 @@ export function AuditFilters({
       )}
 
       {isExporting && (
-        <p role="status" className="mt-3 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+        <p role="status" className="mt-3 text-xs text-ink2">
           {MSG_EXPORTING_CSV}
         </p>
       )}

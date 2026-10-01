@@ -45,22 +45,22 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
               type="checkbox"
               disabled={disabled}
               className={cx(
-                "h-4 w-4 rounded border text-[#fd6321] transition-colors",
-                "border-[#d1d5db] dark:border-[#374151] dark:bg-[#1a1d21]",
-                "focus:ring-2 focus:ring-[#fd6321] focus:ring-offset-2 dark:focus:ring-offset-[#1a1d21]",
-                Boolean(error) && "border-rose-500"
+                "h-4 w-4 rounded border text-primary transition-colors",
+                "border-line dark:border-[#374151] dark:bg-[#1a1d21]",
+                "focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1a1d21]",
+                Boolean(error) && "border-danger"
               )}
               {...props}
             />
           </div>
           <div className="text-sm">
             {label && (
-              <span className="font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+              <span className="font-medium text-ink dark:text-[#f3f4f6]">
                 {label}
               </span>
             )}
             {description && (
-              <p className="text-xs text-[#6c757d] dark:text-[#a0aec0] mt-0.5">
+              <p className="text-xs text-ink2 dark:text-[#a0aec0] mt-0.5">
                 {description}
               </p>
             )}
@@ -69,7 +69,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         {error && (
           <p
             role="alert"
-            className="text-xs font-medium text-rose-600 dark:text-rose-400 pl-7"
+            className="text-xs font-medium text-danger dark:text-rose-400 pl-7"
           >
             {error}
           </p>

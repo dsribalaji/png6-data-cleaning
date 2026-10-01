@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { IconDownload, IconExternalLink, IconListCheck } from "@tabler/icons-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Can } from "../../../auth/Can";
 import { usePermission, type Permission } from "../../../auth/permissions";
 import { ApiError } from "../../../api/client";
@@ -46,39 +47,8 @@ import {
   type AuditFiltersState,
 } from "../api";
 
-/** Event types render as a neutral code badge; there is no severity signal. */
-const EVENT_BADGE_VARIANT: Record<string, "info" | "warning" | "success" | "danger" | "secondary"> = {
-  login: "success",
-  logout: "secondary",
-  "dataset.upload": "info",
-  "plan.approve": "info",
-  "plan.execute": "info",
-  "validation.completed": "success",
-  export: "warning",
-  rollback: "danger",
-  "user.invite": "secondary",
-  "model.update": "secondary",
-};
-
-function eventVariant(
-  eventType: string
-): "info" | "warning" | "success" | "danger" | "secondary" {
-  return EVENT_BADGE_VARIANT[eventType] ?? "secondary";
-}
-
-/** The audit filter bar lives in the URL, so a filtered view can be shared. */
-function toUrlParams(filters: AuditFiltersState, page: number): URLSearchParams {
-  const params = new URLSearchParams();
-  if (filters.fromDate) params.set("from", filters.fromDate);
-  if (filters.toDate) params.set("to", filters.toDate);
-  for (const eventType of filters.eventTypes) params.append("eventType", eventType);
-  if (filters.userId) params.set("userId", filters.userId);
-  if (page > 1) params.set("page", String(page));
-  return params;
-}
-
 /**
- * S9 Audit trail (PRD Section 7, wireframe 1l).
+ * S9 Audit trail (PRD Section 7, wireframe 1l, preview.html spec).
  *
  * Read-only. Every filter is mirrored into the query string, the newest event is
  * listed first, and only roles holding `audit.export` see the export control.
@@ -86,6 +56,7 @@ function toUrlParams(filters: AuditFiltersState, page: number): URLSearchParams 
 export function AuditPage() {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const shouldReduceMotion = useReducedMotion();
 
   const canFilterByUser = usePermission("users.view");
 
@@ -136,15 +107,26 @@ export function AuditPage() {
 
   const applyFilters = useCallback(
     (next: AuditFiltersState) => {
-      // Any filter change returns to the first page of results.
-      setSearchParams(toUrlParams(next, 1), { replace: true });
+      const params = new URLSearchParams();
+      if (next.fromDate) params.set("from", next.fromDate);
+      if (next.toDate) params.set("to", next.toDate);
+      for (const eventType of next.eventTypes) params.append("eventType", eventType);
+      if (next.userId) params.set("userId", next.userId);
+      setSearchParams(params, { replace: true });
     },
     [setSearchParams]
   );
 
   const goToPage = useCallback(
     (next: number) => {
-      setSearchParams(toUrlParams(filters, Math.max(1, next)));
+      const params = new URLSearchParams();
+      if (filters.fromDate) params.set("from", filters.fromDate);
+      if (filters.toDate) params.set("to", filters.toDate);
+      for (const eventType of filters.eventTypes) params.append("eventType", eventType);
+      if (filters.userId) params.set("userId", filters.userId);
+      const targetPage = Math.max(1, next);
+      if (targetPage > 1) params.set("page", String(targetPage));
+      setSearchParams(params);
     },
     [filters, setSearchParams]
   );
@@ -166,7 +148,7 @@ export function AuditPage() {
         header: MSG_TIMESTAMP_UTC,
         accessorFn: (row) => row.occurredAt,
         cell: ({ row }) => (
-          <span className="whitespace-nowrap tabular-nums">
+          <span className="whitespace-nowrap tabular-nums text-ink2 text-xs">
             {formatUtc(row.original.occurredAt)}
           </span>
         ),
@@ -177,9 +159,9 @@ export function AuditPage() {
         accessorFn: (row) => row.userEmail ?? "",
         cell: ({ row }) =>
           row.original.userEmail ? (
-            <span className="font-medium">{row.original.userEmail}</span>
+            <span className="font-medium text-ink">{row.original.userEmail}</span>
           ) : (
-            <span className="text-[#6c757d] dark:text-[#a0aec0]">—</span>
+            <span className="text-ink2">—</span>
           ),
       },
       {
@@ -197,9 +179,9 @@ export function AuditPage() {
         header: MSG_EVENT,
         accessorFn: (row) => row.eventType,
         cell: ({ row }) => (
-          <Badge variant={eventVariant(row.original.eventType)}>
-            <span className="font-mono">{row.original.eventType}</span>
-          </Badge>
+          <kbd className="inline-block rounded border border-line bg-canvas px-2 py-0.5 font-mono text-xs font-medium text-ink2">
+            {row.original.eventType}
+          </kbd>
         ),
       },
       {
@@ -210,13 +192,11 @@ export function AuditPage() {
           const { objectType, objectId } = row.original;
           const target = auditObjectTarget(row.original);
 
-          // An object link is hidden when the role cannot open the target, so
-          // nobody is routed into a 403 page.
           if (target === null || allowedPerms[target.perm] !== true) {
             return (
-              <span className="font-mono">
+              <span className="font-mono text-xs text-ink">
                 {objectId}{" "}
-                <span className="text-[#6c757d] dark:text-[#a0aec0]">
+                <span className="font-sans text-ink2">
                   ({objectType})
                 </span>
               </span>
@@ -226,10 +206,10 @@ export function AuditPage() {
           return (
             <Link
               to={target.to}
-              className="inline-flex items-center gap-1.5 font-mono text-[#0d6efd] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321] dark:text-[#5b9bff]"
+              className="inline-flex items-center gap-1.5 font-mono text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {objectId}{" "}
-              <span className="font-sans text-[#6c757d] dark:text-[#a0aec0]">
+              <span className="font-sans text-ink2">
                 ({objectType})
               </span>
               <IconExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
@@ -271,13 +251,20 @@ export function AuditPage() {
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-bold tracking-tight text-[#1f2937] dark:text-[#f3f4f6]">
-          {MSG_AUDIT_TITLE}
-        </h1>
-        <p className="mt-0.5 text-sm text-[#6c757d] dark:text-[#a0aec0]">
-          {MSG_AUDIT_SUBTITLE}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-ink">
+            {MSG_AUDIT_TITLE}
+          </h1>
+          <p className="mt-0.5 text-sm text-ink2">
+            {MSG_AUDIT_SUBTITLE}
+          </p>
+        </div>
+        <div>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-ink2">
+            Read-only
+          </span>
+        </div>
       </header>
 
       <AuditFilters
@@ -305,7 +292,7 @@ export function AuditPage() {
       {eventsQuery.isError && (
         <div
           role="alert"
-          className="rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger"
         >
           {eventsQuery.error?.detail ||
             eventsQuery.error?.title ||
@@ -316,7 +303,7 @@ export function AuditPage() {
       {!isRangeValid && rangeError && (
         <p
           role="alert"
-          className="rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger"
         >
           {rangeError}
         </p>
@@ -324,8 +311,8 @@ export function AuditPage() {
 
       {showSkeleton ? (
         <div role="status" aria-label={MSG_LOADING(MSG_AUDIT_TITLE)} className="space-y-3">
-          <div className="h-12 w-full rounded-lg bg-[#f2f3f7] animate-pulse dark:bg-[#2d3239]" />
-          <div className="h-72 w-full rounded-lg bg-[#f2f3f7] animate-pulse dark:bg-[#2d3239]" />
+          <div className="h-12 w-full rounded-lg bg-slate-100 animate-pulse dark:bg-slate-800" />
+          <div className="h-72 w-full rounded-lg bg-slate-100 animate-pulse dark:bg-slate-800" />
         </div>
       ) : showEmpty ? (
         <EmptyState
@@ -333,7 +320,18 @@ export function AuditPage() {
           message={MSG_NO_EVENTS_MATCH}
         />
       ) : isRangeValid ? (
-        <>
+        <motion.div
+          whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-ink">Log entries</h2>
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-ink2">
+              {MSG_EVENTS_COUNT(formatInt(total))}
+            </span>
+          </div>
+
           <DataTable
             columns={columns}
             data={events}
@@ -344,7 +342,7 @@ export function AuditPage() {
 
           <nav
             aria-label="Audit trail pagination"
-            className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#6c757d] dark:text-[#a0aec0]"
+            className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-xs text-ink2"
           >
             <span>{MSG_EVENTS_COUNT(formatInt(total))}</span>
             <div className="flex items-center gap-2">
@@ -367,7 +365,11 @@ export function AuditPage() {
               </Button>
             </div>
           </nav>
-        </>
+
+          <p className="mt-4 text-xs text-ink2">
+            Entries are hash-chained and cannot be edited or deleted.
+          </p>
+        </motion.div>
       ) : null}
     </div>
   );

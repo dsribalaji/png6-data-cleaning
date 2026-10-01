@@ -109,7 +109,7 @@ export function EditStepModal({
       {keys.length === 0 ? (
         <EmptyState message="This step has no parameters to edit." />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 text-ink">
           {keys.map((key) => {
             const fieldId = `${fieldPrefix}-${key}`;
             return (
@@ -131,3 +131,5 @@ export function EditStepModal({
     </Modal>
   );
 }
+
+export default EditStepModal;

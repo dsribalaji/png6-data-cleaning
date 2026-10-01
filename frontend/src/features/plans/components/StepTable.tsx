@@ -8,12 +8,12 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { IconAlertTriangle } from "@tabler/icons-react";
+import { motion, useReducedMotion } from "motion/react";
 import type { PlanStep } from "../../../api/schema";
-import { cx, formatInt } from "../../../shared/lib/format";
-import { MESSAGES } from "../../../shared/constants/messages";
-import { Badge } from "../../../shared/ui/Badge";
+import { cx } from "../../../shared/lib/format";
 import { MSG_AI_TAG, MSG_AI_TAG_TITLE } from "../../../shared/constants/messages";
-import { RadioGroup } from "../../../shared/ui/RadioGroup";
+import { Badge } from "../../../shared/ui/Badge";
+import { Button } from "../../../shared/ui/Button";
 import { Skeleton } from "../../../shared/ui/Skeleton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
 import {
@@ -21,17 +21,10 @@ import {
   formatPct2dp,
   fractionToPct,
   getStepChoice,
-  getStepLossEstimate,
   getStepLossPct,
   isStepOverThreshold,
 } from "../api";
-import { decisionChoiceSchema, type DecisionChoice } from "../schemas";
-
-const DECISION_OPTIONS = [
-  { value: "accept", label: MESSAGES.ACCEPT },
-  { value: "edit", label: MESSAGES.EDIT },
-  { value: "reject", label: MESSAGES.REJECT },
-];
+import type { DecisionChoice } from "../schemas";
 
 export interface StepTableProps {
   steps: PlanStep[];
@@ -42,6 +35,17 @@ export interface StepTableProps {
   pendingStepIds?: readonly string[];
   onSelectStep: (step: PlanStep) => void;
   onDecisionChoice: (step: PlanStep, choice: DecisionChoice) => void;
+}
+
+/** Operations that must be human-decided and never automatically accepted. */
+export function isNeverAutoStep(step: PlanStep): boolean {
+  const op = step.operation?.toLowerCase();
+  return (
+    op === "fill_missing" ||
+    op === "derive_column" ||
+    op === "cross_field_fill" ||
+    Boolean(step.parameters && (step.parameters as Record<string, unknown>).neverAuto)
+  );
 }
 
 export function StepTable({
@@ -55,7 +59,7 @@ export function StepTable({
   onDecisionChoice,
 }: StepTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "stepNo", desc: false }]);
-  const [draftChoice, setDraftChoice] = useState<Record<string, DecisionChoice>>({});
+  const shouldReduceMotion = useReducedMotion();
 
   const columns = useMemo<ColumnDef<PlanStep, any>[]>(() => {
     const numeric = { isNumeric: true } as const;
@@ -64,11 +68,11 @@ export function StepTable({
     return [
       {
         id: "stepNo",
-        header: "#",
+        header: "Step",
         accessorFn: (row) => row.stepNo,
         meta: numeric,
         cell: ({ getValue }) => (
-          <span className="text-[#6c757d] dark:text-[#a0aec0] font-medium">
+          <span className="font-bold text-ink">
             {getValue<number>()}
           </span>
         ),
@@ -78,56 +82,81 @@ export function StepTable({
         header: "Operation",
         accessorFn: (row) => describeStep(row),
         meta: textLeft,
-        cell: ({ row }) => (
-          <div className="flex flex-col items-start gap-0.5">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelectStep(row.original);
-              }}
-              className="rounded text-left font-medium text-[#1f2937] dark:text-[#f3f4f6] hover:text-[#fd6321] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321] px-0.5 -mx-0.5"
-            >
-              {describeStep(row.original)}
-            </button>
-            {row.original.source === "llm" && (
-              <Badge variant="info" title={MSG_AI_TAG_TITLE}>
-                {MSG_AI_TAG}
-              </Badge>
-            )}
-            {row.original.decisionReason && (
-              <span className="text-xs italic text-[#6c757d] dark:text-[#a0aec0]">
-                {row.original.decisionReason}
+        cell: ({ row }) => {
+          const step = row.original;
+          return (
+            <div className="flex flex-col items-start gap-1">
+              <span className="font-medium text-ink">
+                {step.operation.replace(/_/g, " ")}
               </span>
-            )}
-          </div>
-        ),
+              {step.source === "llm" && (
+                <Badge variant="info" title={MSG_AI_TAG_TITLE}>
+                  {MSG_AI_TAG}
+                </Badge>
+              )}
+              {step.decisionReason && (
+                <span className="text-xs italic text-ink2">
+                  {step.decisionReason}
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
-        id: "cells",
-        header: "Cells",
-        accessorFn: (row) => getStepLossEstimate(row)?.cellsAffected ?? 0,
-        meta: numeric,
-        cell: ({ getValue }) => (
-          <span className="tabular-nums">{formatInt(getValue<number>())}</span>
-        ),
+        id: "target",
+        header: "Target",
+        meta: textLeft,
+        cell: ({ row }) => {
+          const cols = row.original.changedColumns ?? [];
+          const targetText = cols.length > 0 ? cols.join(", ") : "all";
+          return (
+            <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-xs text-ink2 border border-line">
+              {targetText}
+            </code>
+          );
+        },
       },
       {
         id: "loss",
-        header: "Loss",
+        header: "Est. loss",
         accessorFn: (row) => getStepLossPct(row),
-        meta: numeric,
+        meta: textLeft,
         cell: ({ row }) => {
-          const overThreshold = isStepOverThreshold(row.original, lossThreshold);
+          const step = row.original;
+          const lossPct = getStepLossPct(step);
+          const thresholdPct = fractionToPct(lossThreshold);
+          const overThreshold = isStepOverThreshold(step, lossThreshold);
+          // Bar width = (loss / threshold) * 100
+          const barWidth =
+            thresholdPct > 0 ? Math.min(100, Math.round((lossPct / thresholdPct) * 100)) : 0;
+
           return (
-            <div className="flex items-center justify-end gap-2">
-              <span className="tabular-nums">
-                {formatPct2dp(getStepLossPct(row.original))}
+            <div className="flex items-center gap-2">
+              <span className="min-w-[36px] text-xs tabular-nums text-ink">
+                {formatPct2dp(lossPct)}
               </span>
+              <div
+                className="h-2 w-24 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0"
+                role="progressbar"
+                aria-valuenow={barWidth}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Loss for step ${step.stepNo}`}
+              >
+                <div
+                  className={cx(
+                    "h-full rounded-full transition-all duration-300",
+                    overThreshold ? "bg-danger" : "bg-primary"
+                  )}
+                  style={{ width: `${Math.max(barWidth > 0 ? 3 : 1, barWidth)}%` }}
+                />
+              </div>
               {overThreshold && (
-                <Badge variant="danger" icon={<IconAlertTriangle className="h-3 w-3" />}>
+                <span className="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-danger">
+                  <IconAlertTriangle className="h-3 w-3" aria-hidden="true" />
                   High
-                </Badge>
+                </span>
               )}
             </div>
           );
@@ -140,69 +169,171 @@ export function StepTable({
         meta: textLeft,
         cell: ({ row }) => {
           const step = row.original;
+          const isPending = pendingStepIds.includes(step.id);
+          const choice = getStepChoice(step, lossThreshold);
+          const isNeverAuto = isNeverAutoStep(step);
+
           if (!canDecide) {
-            const persisted = getStepChoice(step, lossThreshold);
+            if (choice === "accept") {
+              return (
+                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-success">
+                  Approved
+                </span>
+              );
+            }
+            if (choice === "reject") {
+              return (
+                <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-danger">
+                  Rejected
+                </span>
+              );
+            }
+            if (choice === "edit") {
+              return (
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-info">
+                  Edited
+                </span>
+              );
+            }
             return (
-              <span className="text-sm text-[#495057] dark:text-[#cbd5e1]">
-                {persisted
-                  ? DECISION_OPTIONS.find((option) => option.value === persisted)?.label
-                  : "—"}
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-ink2">
+                {isNeverAuto ? "Pending — never auto" : "Pending"}
               </span>
             );
           }
 
-          const shown = draftChoice[step.id] ?? getStepChoice(step, lossThreshold);
-          const isPending = pendingStepIds.includes(step.id);
-          const isShownDefault = step.decision === "pending" && draftChoice[step.id] === undefined;
-
-          const dispatchDecision = (choice: DecisionChoice) => {
-            if (choice === "accept") {
-              setDraftChoice((prev) => {
-                const next = { ...prev };
-                delete next[step.id];
-                return next;
-              });
-            } else {
-              setDraftChoice((prev) => ({ ...prev, [step.id]: choice }));
-            }
-            onDecisionChoice(step, choice);
-          };
-
           return (
             <div
-              className="flex items-center"
-              onClick={(event) => {
-                event.stopPropagation();
-                if (!isShownDefault) return;
-                const target = event.target as HTMLElement;
-                const input =
-                  target instanceof HTMLInputElement
-                    ? target
-                    : target.closest("label")?.querySelector("input");
-                if (input?.value === "accept") {
-                  dispatchDecision("accept");
-                }
-              }}
-              role="group"
-              aria-label={`Decision for step ${step.stepNo}`}
+              className="inline-flex flex-wrap items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
             >
-              <RadioGroup
-                name={`step-decision-${step.id}`}
-                value={shown}
-                onChange={(value) => dispatchDecision(decisionChoiceSchema.parse(value))}
-                options={DECISION_OPTIONS.map((option) => ({
-                  ...option,
-                  disabled: isPending,
-                }))}
-                orientation="horizontal"
-                className="gap-4"
-              />
+              {choice === "accept" ? (
+                <>
+                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-success">
+                    Approved
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "reject")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "edit")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Edit
+                  </Button>
+                </>
+              ) : choice === "reject" ? (
+                <>
+                  <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-danger">
+                    Rejected
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "accept")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "edit")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Edit
+                  </Button>
+                </>
+              ) : choice === "edit" ? (
+                <>
+                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-info">
+                    Edited
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "accept")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "reject")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Reject
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span
+                    className={cx(
+                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                      isNeverAuto
+                        ? "bg-amber-100 text-warning"
+                        : "bg-slate-100 text-ink2"
+                    )}
+                  >
+                    {isNeverAuto ? "Pending — never auto" : "Pending"}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "accept")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "reject")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onDecisionChoice(step, "edit")}
+                    className="text-xs text-ink2 hover:text-ink"
+                  >
+                    Edit
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSelectStep(step)}
+                className="text-xs text-ink2 hover:text-ink"
+              >
+                Details
+              </Button>
             </div>
           );
         },
       },
     ];
-  }, [canDecide, draftChoice, lossThreshold, onDecisionChoice, onSelectStep, pendingStepIds]);
+  }, [canDecide, lossThreshold, onDecisionChoice, onSelectStep, pendingStepIds]);
 
   const table = useReactTable({
     data: steps,
@@ -217,13 +348,20 @@ export function StepTable({
   const thresholdPct = fractionToPct(lossThreshold);
 
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-[#e9ecef] dark:border-[#343a40] bg-white dark:bg-[#24282e] shadow-sm">
+    <div className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm transition-transform hover:-translate-y-px">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-base font-semibold text-ink">Steps</h2>
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-ink2">
+          Click row for diff details
+        </span>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm border-collapse">
           <caption className="sr-only">
             Cleaning plan steps with the estimated data loss for each and the decision made
           </caption>
-          <thead className="bg-[#f8f9fa] dark:bg-[#1f2327] text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0] border-b border-[#e9ecef] dark:border-[#343a40]">
+          <thead className="border-b border-line bg-canvas text-xs font-semibold uppercase tracking-wider text-ink2">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -238,7 +376,7 @@ export function StepTable({
                     <th
                       key={header.id}
                       scope="col"
-                      className={cx("px-4 py-3.5 select-none", isNumeric && "text-right")}
+                      className={cx("px-4 py-3 select-none", isNumeric && "text-right")}
                     >
                       {header.isPlaceholder ? null : canSort ? (
                         <button
@@ -248,7 +386,7 @@ export function StepTable({
                             sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
                           }
                           className={cx(
-                            "inline-flex items-center gap-1.5 rounded hover:text-[#1f2937] dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321]",
+                            "inline-flex items-center gap-1.5 rounded hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                             isNumeric && "flex-row-reverse"
                           )}
                         >
@@ -271,7 +409,7 @@ export function StepTable({
             ))}
           </thead>
 
-          <tbody className="divide-y divide-[#e9ecef] dark:divide-[#343a40] text-[#1f2937] dark:text-[#f3f4f6]">
+          <tbody className="divide-y divide-line text-ink">
             {loading ? (
               Array.from({ length: 5 }).map((_, rowIndex) => (
                 <tr key={`step-skeleton-${rowIndex}`} className="animate-pulse">
@@ -289,18 +427,25 @@ export function StepTable({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => {
+              rows.map((row, index) => {
                 const step = row.original;
                 const isSelected = selectedStepId === step.id;
                 return (
-                  <tr
+                  <motion.tr
                     key={row.id}
+                    initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.22,
+                      ease: "easeOut",
+                      delay: shouldReduceMotion ? 0 : index * 0.04,
+                    }}
                     onClick={() => onSelectStep(step)}
                     className={cx(
                       "cursor-pointer transition-colors",
                       isSelected
-                        ? "bg-[#fde8e4]/60 dark:bg-[#3d2420]/60"
-                        : "hover:bg-[#f8f9fa] dark:hover:bg-[#2d3239]"
+                        ? "bg-indigo-50/70 dark:bg-indigo-950/40"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     )}
                   >
                     {row.getVisibleCells().map((cell) => {
@@ -312,13 +457,13 @@ export function StepTable({
                       return (
                         <td
                           key={cell.id}
-                          className={cx("px-4 py-3", isNumeric && "text-right")}
+                          className={cx("px-4 py-3 align-middle", isNumeric && "text-right")}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       );
                     })}
-                  </tr>
+                  </motion.tr>
                 );
               })
             )}
@@ -327,12 +472,14 @@ export function StepTable({
       </div>
 
       {thresholdPct > 0 && (
-        <p className="px-4 py-2.5 border-t border-[#e9ecef] dark:border-[#343a40] bg-[#f8f9fa]/50 dark:bg-[#1f2327]/30 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+        <p className="mt-3 border-t border-line pt-3 text-xs text-ink2">
           Loss threshold: {formatPct2dp(thresholdPct)} of cells. A step above the threshold
-          is flagged <span className="font-semibold">High</span> and needs a decision before the
+          is flagged <span className="font-semibold text-danger">High</span> and needs a decision before the
           plan can be approved.
         </p>
       )}
     </div>
   );
 }
+
+export default StepTable;

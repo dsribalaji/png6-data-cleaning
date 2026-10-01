@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconHistory, IconRotateClockwise } from "@tabler/icons-react";
+import { AnimatePresence } from "motion/react";
 import { usePermission } from "../../../auth/permissions";
 import { formatDateTime, formatInt } from "../../../shared/lib/format";
 import {
@@ -8,7 +9,6 @@ import {
 } from "../../../shared/constants/messages";
 import { Badge } from "../../../shared/ui/Badge";
 import { Button } from "../../../shared/ui/Button";
-import { Card } from "../../../shared/ui/Card";
 import { EmptyState } from "../../../shared/ui/EmptyState";
 import { Skeleton } from "../../../shared/ui/Skeleton";
 import { useToast } from "../../../shared/ui/Toast";
@@ -69,7 +69,7 @@ export interface VersionTimelineProps {
 }
 
 /**
- * S6 version timeline (PRD Section 7, wireframe 1i): newest first, v0 labelled
+ * S6 version timeline (PRD Section 7, wireframe 1i, preview.html spec): newest first, v0 labelled
  * "Original (immutable)", and "Roll back here" on every row except the current
  * one — hidden (not disabled) for roles without `plan.rollback`.
  */
@@ -112,109 +112,146 @@ export function VersionTimeline({
   };
 
   const range = undoneStepRange(versions, target, stepCount);
+  const currentVersion = versions.find((v) => v.isCurrent) ?? versions[0] ?? null;
+  const previousVersion = versions.find((v) => !v.isCurrent) ?? null;
 
   return (
-    <Card
-      title="Version timeline"
-      subtitle="Every executed version is kept. Rolling back creates a new logged version, so nothing is lost."
-      noPadding
-    >
-      {loading && versions.length === 0 ? (
-        <div className="space-y-4 p-5" role="status" aria-label="Loading versions">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-3/4" />
+    <div className="space-y-5">
+      <div className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm transition-transform hover:-translate-y-px">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-semibold text-ink">Version timeline</h2>
+            <p className="mt-0.5 text-xs text-ink2">
+              Every executed version is kept. Rolling back creates a new logged version, so nothing is lost.
+            </p>
+          </div>
+          {currentVersion && (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-ink2">
+              v{currentVersion.n} active
+            </span>
+          )}
         </div>
-      ) : versions.length === 0 ? (
-        <div className="p-5">
+
+        {loading && versions.length === 0 ? (
+          <div className="space-y-4" role="status" aria-label="Loading versions">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-3/4" />
+          </div>
+        ) : versions.length === 0 ? (
           <EmptyState
             icon={<IconHistory className="h-6 w-6 stroke-[1.5]" aria-hidden="true" />}
             message={NO_VERSIONS}
           />
-        </div>
-      ) : (
-        <ol className="px-5 py-5">
-          {versions.map((version, index) => {
-            const isOriginal = version.n === ORIGINAL_VERSION_NO;
-            const isLast = index === versions.length - 1;
-            const rows = version.rows === null ? NO_SHAPE : formatInt(version.rows);
-            const cols = version.cols === null ? NO_SHAPE : formatInt(version.cols);
+        ) : (
+          <ol className="relative space-y-4 pt-1">
+            {versions.map((version, index) => {
+              const isOriginal = version.n === ORIGINAL_VERSION_NO;
+              const isLast = index === versions.length - 1;
+              const rows = version.rows === null ? NO_SHAPE : formatInt(version.rows);
+              const cols = version.cols === null ? NO_SHAPE : formatInt(version.cols);
 
-            return (
-              <li
-                key={version.n}
-                className="relative pl-8 pb-5 last:pb-0"
-              >
-                <span
-                  className="absolute left-[3px] top-2 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#24282e] bg-[#fd6321]"
-                  aria-hidden="true"
-                />
-                {!isLast && (
+              return (
+                <li
+                  key={version.n}
+                  className="relative pl-7 pb-4 last:pb-0"
+                >
                   <span
-                    className="absolute left-[9px] top-7 bottom-0 w-px bg-[#e9ecef] dark:bg-[#343a40]"
+                    className="absolute left-[2px] top-2 h-3.5 w-3.5 rounded-full border-2 border-surface bg-primary"
                     aria-hidden="true"
                   />
-                )}
+                  {!isLast && (
+                    <span
+                      className="absolute left-[8px] top-6 bottom-0 w-px bg-line"
+                      aria-hidden="true"
+                    />
+                  )}
 
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-bold tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
-                        v{version.n}
-                      </span>
-                      {version.isCurrent && (
-                        <Badge variant="success">{CURRENT_LABEL}</Badge>
-                      )}
-                      {isOriginal ? (
-                        <Badge variant="secondary">{MSG_ORIGINAL_IMMUTABLE}</Badge>
-                      ) : version.label ? (
-                        <span className="text-xs text-[#6c757d] dark:text-[#a0aec0]">
-                          {version.label}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-bold tabular-nums text-ink">
+                          v{version.n}
                         </span>
-                      ) : null}
+                        {version.isCurrent && (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-success">
+                            {CURRENT_LABEL}
+                          </span>
+                        )}
+                        {isOriginal ? (
+                          <Badge variant="secondary">{MSG_ORIGINAL_IMMUTABLE}</Badge>
+                        ) : version.label ? (
+                          <span className="text-xs text-ink2">
+                            {version.label}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-ink2">
+                        <span>{formatDateTime(version.createdAt)}</span>
+                        <span>
+                          {ROWS_LABEL} {rows}
+                        </span>
+                        <span>
+                          {COLUMNS_LABEL} {cols}
+                        </span>
+                      </p>
                     </div>
 
-                    <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-[#6c757d] dark:text-[#a0aec0]">
-                      <span>{formatDateTime(version.createdAt)}</span>
-                      <span>
-                        {ROWS_LABEL} {rows}
-                      </span>
-                      <span>
-                        {COLUMNS_LABEL} {cols}
-                      </span>
-                    </p>
+                    {!version.isCurrent && canRollback && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openModal(version)}
+                        leftIcon={
+                          <IconRotateClockwise className="h-3.5 w-3.5" aria-hidden="true" />
+                        }
+                      >
+                        {MESSAGES.ROLL_BACK_HERE}
+                      </Button>
+                    )}
                   </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
 
-                  {!version.isCurrent && canRollback && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openModal(version)}
-                      leftIcon={
-                        <IconRotateClockwise className="h-3.5 w-3.5" aria-hidden="true" />
-                      }
-                    >
-                      {MESSAGES.ROLL_BACK_HERE}
-                    </Button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+      {/* Danger zone card per spec */}
+      {canRollback && previousVersion && (
+        <div className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm transition-transform hover:-translate-y-px">
+          <h2 className="text-base font-semibold text-ink">Danger zone</h2>
+          <p className="mt-1.5 text-xs text-ink2">
+            Restore the pre-execution snapshot. Original data is immutable; rollback is SHA-256 verified.
+          </p>
+          <div className="mt-4">
+            <Button
+              variant="danger"
+              id="run-openRollbackBtn"
+              onClick={() => openModal(previousVersion)}
+            >
+              Roll back to v{previousVersion.n}
+            </Button>
+          </div>
+        </div>
       )}
 
-      <RollbackModal
-        isOpen={target !== null}
-        version={target}
-        fromStep={range.first}
-        toStep={range.last}
-        submitting={rollback.isPending}
-        error={rollbackError}
-        onClose={closeModal}
-        onConfirm={(reason) => void handleConfirm(reason)}
-      />
-    </Card>
+      <AnimatePresence>
+        {target !== null && (
+          <RollbackModal
+            isOpen={target !== null}
+            version={target}
+            fromStep={range.first}
+            toStep={range.last}
+            submitting={rollback.isPending}
+            error={rollbackError}
+            onClose={closeModal}
+            onConfirm={(reason) => void handleConfirm(reason)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

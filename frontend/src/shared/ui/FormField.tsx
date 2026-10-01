@@ -12,7 +12,7 @@ export interface FormFieldProps {
 }
 
 /**
- * CRMS FormField wrapper:
+ * FormField wrapper:
  * - Top-aligned label
  * - Red asterisk for required fields
  * - Subtle hint text
@@ -33,11 +33,11 @@ export function FormField({
         <div className="flex items-center justify-between">
           <label
             htmlFor={htmlFor}
-            className="block text-xs font-semibold text-[#1f2937] dark:text-[#f3f4f6]"
+            className="block text-xs font-semibold text-ink dark:text-[#f3f4f6]"
           >
             {label}
             {required && (
-              <span className="text-red-500 ml-1 font-bold" aria-hidden="true">
+              <span className="text-danger ml-1 font-bold" aria-hidden="true">
                 *
               </span>
             )}
@@ -48,13 +48,13 @@ export function FormField({
       <div>{children}</div>
 
       {hint && !error && (
-        <p className="text-xs text-[#6c757d] dark:text-[#a0aec0]">{hint}</p>
+        <p className="text-xs text-ink2 dark:text-[#a0aec0]">{hint}</p>
       )}
 
       {error && (
         <p
           role="alert"
-          className="text-xs font-medium text-rose-600 dark:text-rose-400"
+          className="text-xs font-medium text-danger dark:text-rose-400"
         >
           {error}
         </p>

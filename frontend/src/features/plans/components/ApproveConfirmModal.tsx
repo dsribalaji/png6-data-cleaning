@@ -38,7 +38,9 @@ export function ApproveConfirmModal({
         </>
       }
     >
-      <p className="text-sm text-[#1f2937] dark:text-[#f3f4f6]">{approveConfirm(stepCount)}</p>
+      <p className="text-sm text-ink">{approveConfirm(stepCount)}</p>
     </Modal>
   );
 }
+
+export default ApproveConfirmModal;

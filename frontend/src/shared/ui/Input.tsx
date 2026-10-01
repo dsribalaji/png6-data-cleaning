@@ -35,9 +35,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const id = customId || generatedId;
 
     const inputElement = (
-      <div className="relative rounded-md shadow-sm">
+      <div className="relative rounded-lg shadow-sm">
         {leftIcon && (
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#6c757d] dark:text-[#a0aec0]">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink2 dark:text-[#a0aec0]">
             {leftIcon}
           </div>
         )}
@@ -51,14 +51,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             error ? `${id}-error` : hint ? `${id}-hint` : undefined
           }
           className={cx(
-            "block w-full rounded-md border text-sm transition-colors shadow-sm",
-            "bg-white dark:bg-[#1a1d21] text-[#1f2937] dark:text-[#f3f4f6]",
-            "placeholder:text-[#adb5bd] dark:placeholder:text-[#6c757d]",
+            "block w-full rounded-lg border text-sm transition-colors shadow-sm",
+            "bg-surface dark:bg-[#1a1d21] text-ink dark:text-[#f3f4f6]",
+            "placeholder:text-muted dark:placeholder:text-[#6c757d]",
             error
-              ? "border-rose-500 dark:border-rose-500 focus:border-rose-500 focus:ring-rose-500"
-              : "border-[#d1d5db] dark:border-[#374151] focus:border-[#fd6321] focus:ring-[#fd6321]",
+              ? "border-danger dark:border-rose-500 focus:border-danger focus:ring-danger"
+              : "border-line dark:border-[#374151] focus:border-primary focus:ring-primary",
             "focus:outline-none focus:ring-1",
-            "disabled:cursor-not-allowed disabled:bg-[#f8f9fa] dark:disabled:bg-[#2d3239] disabled:opacity-60",
+            "disabled:cursor-not-allowed disabled:bg-canvas dark:disabled:bg-[#2d3239] disabled:opacity-60",
             leftIcon ? "pl-9" : "pl-3.5",
             rightIcon ? "pr-9" : "pr-3.5",
             "py-2",
@@ -67,7 +67,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {rightIcon && (
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 text-ink2 dark:text-[#a0aec0]">
             {rightIcon}
           </div>
         )}

@@ -9,6 +9,7 @@ import { EmptyState } from "../../../shared/ui/EmptyState";
 import { Modal } from "../../../shared/ui/Modal";
 import { Skeleton } from "../../../shared/ui/Skeleton";
 import { MSG_CLOSE } from "../../../shared/constants/messages";
+import { motion, useReducedMotion } from "motion/react";
 
 const EVIDENCE_LABEL = "Evidence";
 const CONFIDENCE_LABEL = "Confidence";
@@ -86,9 +87,9 @@ export function EvidenceModal({ isOpen, onClose, rows }: EvidenceModalProps) {
           {NO_EVIDENCE}
         </p>
       ) : (
-        <div className="max-h-[50vh] overflow-auto rounded-md border border-[#e9ecef] dark:border-[#343a40]">
+        <div className="max-h-[50vh] overflow-auto rounded-md border border-line dark:border-[#343a40]">
           <table className="w-full border-collapse text-left text-xs">
-            <thead className="sticky top-0 bg-[#f8f9fa] dark:bg-[#1f2327] text-[#6c757d] dark:text-[#a0aec0]">
+            <thead className="sticky top-0 bg-canvas dark:bg-[#1f2327] text-ink2 dark:text-[#a0aec0]">
               <tr>
                 {headers.map((header) => (
                   <th
@@ -101,13 +102,13 @@ export function EvidenceModal({ isOpen, onClose, rows }: EvidenceModalProps) {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e9ecef] dark:divide-[#343a40]">
+            <tbody className="divide-y divide-line dark:divide-[#343a40]">
               {sample.map((row, rowIndex) => (
                 <tr key={`evidence-row-${rowIndex}`}>
                   {headers.map((header) => (
                     <td
                       key={header}
-                      className="max-w-[18rem] truncate px-3 py-2 text-[#1f2937] dark:text-[#f3f4f6]"
+                      className="max-w-[18rem] truncate px-3 py-2 text-ink dark:text-[#f3f4f6]"
                     >
                       {cellText(row[header])}
                     </td>
@@ -132,6 +133,7 @@ export interface InferredRulesListProps {
  * two decimal places, and an Evidence button opening up to 10 sample rows.
  */
 export function InferredRulesList({ rules, loading = false }: InferredRulesListProps) {
+  const shouldReduceMotion = useReducedMotion();
   const [evidence, setEvidence] = useState<InferredRule | null>(null);
 
   return (
@@ -154,10 +156,17 @@ export function InferredRulesList({ rules, loading = false }: InferredRulesListP
           />
         </div>
       ) : (
-        <ul className="divide-y divide-[#e9ecef] dark:divide-[#343a40]">
-          {rules?.map((rule) => (
-            <li
+        <ul className="divide-y divide-line dark:divide-[#343a40]">
+          {rules?.map((rule, index) => (
+            <motion.li
               key={rule.id}
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0 }
+                  : { duration: 0.22, ease: "easeOut", delay: index * 0.04 }
+              }
               className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
             >
               <div className="min-w-0 flex-1">
@@ -171,22 +180,22 @@ export function InferredRulesList({ rules, loading = false }: InferredRulesListP
                     </Badge>
                   )}
                   {rule.columns.length > 0 && (
-                    <span className="text-xs text-[#6c757d] dark:text-[#a0aec0]">
+                    <span className="text-xs text-ink2 dark:text-[#a0aec0]">
                       {rule.columns.join(", ")}
                     </span>
                   )}
                 </div>
-                <p className="mt-1.5 break-words font-mono text-xs text-[#1f2937] dark:text-[#f3f4f6]">
+                <p className="mt-1.5 break-words font-mono text-xs text-ink dark:text-[#f3f4f6]">
                   {expressionToText(rule.expression)}
                 </p>
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink2 dark:text-[#a0aec0]">
                     {CONFIDENCE_LABEL}
                   </span>
-                  <span className="text-sm font-semibold tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+                  <span className="text-sm font-semibold tabular-nums text-ink dark:text-[#f3f4f6]">
                     {Number(rule.confidence ?? 0).toFixed(2)}
                   </span>
                 </div>
@@ -198,7 +207,7 @@ export function InferredRulesList({ rules, loading = false }: InferredRulesListP
                   {EVIDENCE_LABEL}
                 </Button>
               </div>
-            </li>
+            </motion.li>
           ))}
         </ul>
       )}

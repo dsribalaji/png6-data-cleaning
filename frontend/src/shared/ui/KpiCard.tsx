@@ -11,7 +11,7 @@ export interface KpiCardProps {
 }
 
 /**
- * CRMS white KPI card with icon, label, and high-contrast value.
+ * KPI card with icon, label, and high-contrast value.
  * Used across dashboard and profiling screens (S4).
  */
 export function KpiCard({
@@ -20,24 +20,24 @@ export function KpiCard({
   icon,
   subtext,
   className,
-  iconBgColor = "bg-[#fde8e4] dark:bg-[#3d2420] text-[#fd6321]",
+  iconBgColor = "bg-primary/10 dark:bg-[#3d2420] text-primary",
 }: KpiCardProps) {
   return (
     <div
       className={cx(
-        "bg-white dark:bg-[#24282e] rounded-lg border border-[#e9ecef] dark:border-[#343a40] p-5 shadow-sm flex items-center justify-between transition-colors",
+        "bg-surface dark:bg-[#24282e] rounded-[10px] border border-line dark:border-[#343a40] p-5 shadow-sm flex items-center justify-between hover:-translate-y-px transition-transform",
         className
       )}
     >
       <div className="flex-1 min-w-0 pr-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0] truncate">
+        <p className="text-xs font-semibold uppercase tracking-wider text-ink2 dark:text-[#a0aec0] truncate">
           {label}
         </p>
-        <p className="mt-1.5 text-2xl font-bold text-[#1f2937] dark:text-[#f3f4f6] truncate tracking-tight">
+        <p className="mt-1.5 text-2xl font-bold text-ink dark:text-[#f3f4f6] truncate tracking-tight">
           {value}
         </p>
         {subtext && (
-          <p className="mt-1 text-xs text-[#6c757d] dark:text-[#a0aec0] truncate">
+          <p className="mt-1 text-xs text-ink2 dark:text-[#a0aec0] truncate">
             {subtext}
           </p>
         )}

@@ -2,6 +2,33 @@
 
 Newest first. Each entry: date, decider, decision, rationale, status (active / superseded / proposed).
 
+## 2026-10-01 — Approved UI integrated into the live React frontend (SB approved design, then "integrate to live frontend without breaking anything")
+
+**Decision:** Applied the SB-approved UI design (indigo #4F46E5 system, 220ms Motion
+language, light/desktop-first) to the existing frontend without the shadcn CLI. The
+existing shadcn-style `src/shared/ui` kit was kept and re-tokened in place — the
+approved UI integration contract (2026-10-01, at `~/workspace/verification/DESIGN_CONTRACT_UI_INTEGRATION.md`)
+defines the tokens; the older `DESIGN_CONTRACT.md` §10.3 CRMS palette is superseded for
+this task by SB's approval.
+
+**How:** three parallel agy workers with disjoint ownership — W1 foundation
+(package.json +motion 13.4.6, tailwind tokens, index.css, index.html, shared/ui 17
+primitives with Motion-wrapped Modal/Drawer/Toast/DataTable, AppShell), W2 datasets +
+diagnosis (8 files), W3 plans + runs + audit (13 files). Imports only from
+`motion/react`; reduced-motion honored. Coordinator found one gap the workers missed:
+auth pages (Login/AcceptInvite/OIDC) and 403/404 still wore the old orange palette —
+restyled to tokens by class-string mapping only, zero logic touched.
+
+**Verified (coordinator re-ran all gates on the final tree):** 88/88 frontend tests
+pass, `tsc -b --noEmit` clean, `vite build` green. Slice hygiene confirmed: 48 files,
+all under frontend/{index.html,package*,tailwind.config,index.css,src/app/layout,
+src/auth/pages,src/pages,src/features/{datasets,plans,runs,audit},src/shared/ui} —
+no api.ts/hook/schema/route/RBAC/prop-API changes, no backend changes. Old palette
+fully purged from the light theme (dark: variants left dormant, never activated).
+
+**Status:** active. Committed locally only; NOT pushed (SB's standing rule — push needs
+his explicit word).
+
 ## 2026-10-01 — Real-model e2e verified: Groq openai/gpt-oss-120b returns 11 schema-valid rules (SB's stored key)
 
 **Decision:** Verify the AI inference path against the real model instead of leaving it

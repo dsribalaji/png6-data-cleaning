@@ -39,6 +39,7 @@ import { AiStatusBanner } from "../../../shared/ui/AiStatusBanner";
 import { ProfileGrid } from "../components/ProfileGrid";
 import { QuarantineDrawer } from "../components/QuarantineDrawer";
 import { StatusBadge } from "../components/StatusBadge";
+import { motion, useReducedMotion } from "motion/react";
 
 const SOURCE_LABELS: Record<DatasetSource, string> = {
   upload: "Upload file",
@@ -92,6 +93,7 @@ function splitQuarantineBanner(count: number): { sentence: string; link: string 
  * the page keeps no independent copy of server data.
  */
 export function DatasetProfilePage() {
+  const shouldReduceMotion = useReducedMotion();
   const { id } = useParams<{ id: string }>();
   const datasetId = id ?? "";
   const navigate = useNavigate();
@@ -170,7 +172,7 @@ export function DatasetProfilePage() {
     return (
       <div
         role="alert"
-        className="rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+        className="rounded-[10px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
       >
         {LOAD_FAILED}
       </div>
@@ -189,12 +191,12 @@ export function DatasetProfilePage() {
           >
             Datasets
           </Button>
-          <h1 className="mt-1.5 flex flex-wrap items-center gap-3 text-xl font-bold tracking-tight text-[#1f2937] dark:text-[#f3f4f6]">
+          <h1 className="mt-1.5 flex flex-wrap items-center gap-3 text-xl font-bold tracking-tight text-ink dark:text-[#f3f4f6]">
             {dataset?.name ?? "…"}
             <StatusBadge status={dataset?.status} />
           </h1>
           {dataset && (
-            <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+            <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink2 dark:text-[#a0aec0]">
               <span>
                 {MSG_SOURCE}: {SOURCE_LABELS[dataset.source] ?? dataset.source}
               </span>
@@ -222,7 +224,7 @@ export function DatasetProfilePage() {
       {planError && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
         >
           <span>{planError}</span>
           {/* The shared Toast exposes no action slot, so the Retry action sits
@@ -241,7 +243,7 @@ export function DatasetProfilePage() {
       {quarantinedRows > 0 && (
         <div
           role="status"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-ink dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
         >
           <span>{banner.sentence}</span>
           <Button
@@ -269,33 +271,87 @@ export function DatasetProfilePage() {
           aria-label="Dataset summary"
           className="grid grid-cols-2 gap-4 lg:grid-cols-5"
         >
-          <KpiCard
-            label={KPI_ROWS}
-            value={formatInt(summary?.rowCount ?? dataset?.rowCount ?? 0)}
-            icon={<IconDatabase className="h-5 w-5" aria-hidden="true" />}
-          />
-          <KpiCard
-            label={KPI_COLUMNS}
-            value={formatInt(summary?.columnCount ?? dataset?.columnCount ?? 0)}
-            icon={<IconColumns className="h-5 w-5" aria-hidden="true" />}
-          />
-          <KpiCard
-            label={KPI_COLUMNS_WITH_NULLS}
-            value={formatInt(summary?.columnsWithNullsCount ?? 0)}
-            icon={<IconTable className="h-5 w-5" aria-hidden="true" />}
-          />
-          <KpiCard
-            label={KPI_NESTED_COLUMNS}
-            value={formatInt(summary?.nestedColumnsCount ?? 0)}
-            icon={<IconTopologyStar3 className="h-5 w-5" aria-hidden="true" />}
-          />
-          <KpiCard
-            label={KPI_QUARANTINED}
-            value={formatInt(quarantinedRows)}
-            subtext={quarantinedRows > 0 ? undefined : NONE}
-            iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300"
-            icon={<IconAlertTriangle className="h-5 w-5" aria-hidden="true" />}
-          />
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldReduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: "easeOut", delay: 0 }
+            }
+          >
+            <KpiCard
+              label={KPI_ROWS}
+              value={formatInt(summary?.rowCount ?? dataset?.rowCount ?? 0)}
+              iconBgColor="bg-primary/10 text-primary"
+              icon={<IconDatabase className="h-5 w-5" aria-hidden="true" />}
+            />
+          </motion.div>
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldReduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: "easeOut", delay: 0.04 }
+            }
+          >
+            <KpiCard
+              label={KPI_COLUMNS}
+              value={formatInt(summary?.columnCount ?? dataset?.columnCount ?? 0)}
+              iconBgColor="bg-primary/10 text-primary"
+              icon={<IconColumns className="h-5 w-5" aria-hidden="true" />}
+            />
+          </motion.div>
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldReduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: "easeOut", delay: 0.08 }
+            }
+          >
+            <KpiCard
+              label={KPI_COLUMNS_WITH_NULLS}
+              value={formatInt(summary?.columnsWithNullsCount ?? 0)}
+              iconBgColor="bg-primary/10 text-primary"
+              icon={<IconTable className="h-5 w-5" aria-hidden="true" />}
+            />
+          </motion.div>
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldReduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: "easeOut", delay: 0.12 }
+            }
+          >
+            <KpiCard
+              label={KPI_NESTED_COLUMNS}
+              value={formatInt(summary?.nestedColumnsCount ?? 0)}
+              iconBgColor="bg-primary/10 text-primary"
+              icon={<IconTopologyStar3 className="h-5 w-5" aria-hidden="true" />}
+            />
+          </motion.div>
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldReduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: "easeOut", delay: 0.16 }
+            }
+          >
+            <KpiCard
+              label={KPI_QUARANTINED}
+              value={formatInt(quarantinedRows)}
+              subtext={quarantinedRows > 0 ? undefined : NONE}
+              iconBgColor="bg-warning/10 text-warning"
+              icon={<IconAlertTriangle className="h-5 w-5" aria-hidden="true" />}
+            />
+          </motion.div>
         </section>
       )}
 

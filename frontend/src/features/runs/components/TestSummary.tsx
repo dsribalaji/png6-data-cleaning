@@ -63,7 +63,7 @@ function tileValue(summary: TestSuiteSummary): string {
 }
 
 /**
- * KPI-tile shaped button (same CRMS white card as `KpiCard`, but interactive):
+ * KPI-tile shaped button (spec card, interactive):
  * clicking expands the test list underneath the tiles.
  */
 function TestTile({
@@ -88,18 +88,18 @@ function TestTile({
       onClick={onToggle}
       aria-expanded={expanded}
       className={cx(
-        "flex items-center justify-between gap-4 rounded-lg border bg-white dark:bg-[#24282e] p-5 shadow-sm text-left transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1a1d21]",
+        "flex items-center justify-between gap-4 rounded-[10px] border bg-surface p-5 shadow-sm text-left transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         expanded
-          ? "border-[#fd6321] dark:border-[#fd6321]"
-          : "border-[#e9ecef] dark:border-[#343a40] hover:border-[#fd6321] dark:hover:border-[#fd6321]"
+          ? "border-primary ring-1 ring-primary"
+          : "border-line hover:border-primary hover:-translate-y-px"
       )}
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0] truncate">
+        <span className="block text-xs font-semibold uppercase tracking-wider text-ink2 truncate">
           {SUITE_LABEL[suite]}
         </span>
-        <span className="mt-1.5 block text-2xl font-bold tracking-tight tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+        <span className="mt-1.5 block text-2xl font-bold tracking-tight tabular-nums text-ink">
           {tileValue(summary)}
         </span>
       </span>
@@ -107,7 +107,7 @@ function TestTile({
       <span className="flex flex-shrink-0 items-center gap-2">
         <Badge variant={stateVariant}>{stateLabel}</Badge>
         <span
-          className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#fde8e4] dark:bg-[#3d2420] text-[#fd6321]"
+          className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-primary"
           aria-hidden="true"
         >
           {expanded ? (
@@ -126,7 +126,7 @@ const testColumns: ColumnDef<TestRunRow, any>[] = [
     id: "name",
     header: NAME_LABEL,
     cell: ({ row }) => (
-      <span className="font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+      <span className="font-medium text-ink">
         {row.original.name}
       </span>
     ),
@@ -157,7 +157,7 @@ const testColumns: ColumnDef<TestRunRow, any>[] = [
 ];
 
 /**
- * S6 test tiles (PRD Section 7, wireframe 1i): Unit passed/total and
+ * S6 test tiles (PRD Section 7, wireframe 1i, preview.html spec): Unit passed/total and
  * Integration passed/total. Clicking a tile expands its test list — name,
  * target step, result badge, run time in milliseconds.
  */
@@ -177,10 +177,10 @@ export function TestSummary({ validation, loading = false }: TestSummaryProps) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Skeleton className="h-24 rounded-lg" />
-          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-[10px]" />
+          <Skeleton className="h-24 rounded-[10px]" />
         </div>
-        <p className="text-xs text-[#6c757d] dark:text-[#a0aec0]">{CLICK_HINT}</p>
+        <p className="text-xs text-ink2">{CLICK_HINT}</p>
       </div>
     );
   }
@@ -203,11 +203,11 @@ export function TestSummary({ validation, loading = false }: TestSummaryProps) {
 
       {open && (
         <section aria-label={`${SUITE_LABEL[open.suite]} tests`}>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]">
-            <IconFlask2 className="h-4 w-4" aria-hidden="true" />
-            {SUITE_LABEL[open.suite]}
-            <span className="font-normal normal-case tracking-normal">
-              {tileValue(open.summary)}
+          <div className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink2">
+            <IconFlask2 className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span>{SUITE_LABEL[open.suite]}</span>
+            <span className="font-normal normal-case tracking-normal text-muted">
+              ({tileValue(open.summary)})
             </span>
           </div>
           <DataTable

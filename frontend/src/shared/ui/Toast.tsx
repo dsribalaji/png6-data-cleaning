@@ -12,6 +12,7 @@ import {
   IconInfoCircle,
   IconX,
 } from "@tabler/icons-react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { cx } from "../lib/format";
 
 export type ToastType = "success" | "error" | "info";
@@ -40,6 +41,7 @@ export function useToast(): ToastActions {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const shouldReduceMotion = useReducedMotion();
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -76,57 +78,63 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         aria-atomic="true"
         className="fixed bottom-4 right-4 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
       >
-        {toasts.map((toast) => {
-          const isError = toast.type === "error";
-          const isSuccess = toast.type === "success";
+        <AnimatePresence>
+          {toasts.map((toast) => {
+            const isError = toast.type === "error";
+            const isSuccess = toast.type === "success";
 
-          return (
-            <div
-              key={toast.id}
-              role={isError ? "alert" : "status"}
-              className={cx(
-                "pointer-events-auto flex items-start gap-3 p-4 rounded-lg shadow-lg border text-sm transition-all animate-in fade-in slide-in-from-bottom-2",
-                "bg-white dark:bg-[#24282e]",
-                isSuccess &&
-                  "border-emerald-200 dark:border-emerald-800/60 text-[#1f2937] dark:text-[#f3f4f6]",
-                isError &&
-                  "border-rose-200 dark:border-rose-800/60 text-[#1f2937] dark:text-[#f3f4f6]",
-                !isSuccess &&
-                  !isError &&
-                  "border-[#e9ecef] dark:border-[#343a40] text-[#1f2937] dark:text-[#f3f4f6]"
-              )}
-            >
-              <div className="flex-shrink-0 mt-0.5">
-                {isSuccess && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-                    <IconCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                  </div>
+            return (
+              <motion.div
+                key={toast.id}
+                role={isError ? "alert" : "status"}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: 10 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className={cx(
+                  "pointer-events-auto flex items-start gap-3 p-4 rounded-lg shadow-lg border text-sm transition-colors",
+                  "bg-surface dark:bg-[#24282e]",
+                  isSuccess &&
+                    "border-[#BBF7D0] dark:border-emerald-800/60 text-ink dark:text-[#f3f4f6]",
+                  isError &&
+                    "border-[#FECACA] dark:border-rose-800/60 text-ink dark:text-[#f3f4f6]",
+                  !isSuccess &&
+                    !isError &&
+                    "border-line dark:border-[#343a40] text-ink dark:text-[#f3f4f6]"
                 )}
-                {isError && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
-                    <IconAlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  </div>
-                )}
-                {!isSuccess && !isError && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-                    <IconInfoCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 font-medium leading-5">{toast.message}</div>
-
-              <button
-                type="button"
-                onClick={() => removeToast(toast.id)}
-                className="flex-shrink-0 rounded p-1 text-[#6c757d] dark:text-[#a0aec0] hover:bg-[#f2f3f7] dark:hover:bg-[#2d3239] hover:text-[#1f2937] dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321]"
-                aria-label="Dismiss toast"
               >
-                <IconX className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-          );
-        })}
+                <div className="flex-shrink-0 mt-0.5">
+                  {isSuccess && (
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#DCFCE7] dark:bg-emerald-950 text-[#15803D] dark:text-emerald-400">
+                      <IconCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                    </div>
+                  )}
+                  {isError && (
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#FEE2E2] dark:bg-rose-950 text-[#B91C1C] dark:text-rose-400">
+                      <IconAlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    </div>
+                  )}
+                  {!isSuccess && !isError && (
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#DBEAFE] dark:bg-blue-950 text-[#1D4ED8] dark:text-blue-400">
+                      <IconInfoCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 font-medium leading-5">{toast.message}</div>
+
+                <button
+                  type="button"
+                  onClick={() => removeToast(toast.id)}
+                  className="flex-shrink-0 rounded p-1 text-ink2 dark:text-[#a0aec0] hover:bg-canvas dark:hover:bg-[#2d3239] hover:text-ink dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="Dismiss toast"
+                >
+                  <IconX className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   );

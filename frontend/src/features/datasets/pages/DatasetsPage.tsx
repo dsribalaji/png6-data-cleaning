@@ -22,6 +22,7 @@ import {
 } from "../components/StatusBadge";
 import { DatasetGrid } from "../components/DatasetGrid";
 import { UploadDatasetModal } from "../components/UploadDatasetModal";
+import { motion, useReducedMotion } from "motion/react";
 
 const ALL_STATUSES_LABEL = "All statuses";
 const SEARCH_LABEL = "Search by name";
@@ -44,6 +45,7 @@ function loadErrorMessage(error: Error | null): string {
  * stream plus this conditional polling window.
  */
 export function DatasetsPage() {
+  const shouldReduceMotion = useReducedMotion();
   const [searchInput, setSearchInput] = useState("");
   const [status, setStatus] = useState<DatasetStatusFilter>("");
   const [page, setPage] = useState(1);
@@ -94,10 +96,10 @@ export function DatasetsPage() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#1f2937] dark:text-[#f3f4f6]">
+          <h1 className="text-xl font-bold tracking-tight text-ink dark:text-[#f3f4f6]">
             Datasets
           </h1>
-          <p className="mt-0.5 text-sm text-[#6c757d] dark:text-[#a0aec0]">
+          <p className="mt-0.5 text-sm text-ink2 dark:text-[#a0aec0]">
             Upload a file or connect the n8n output folder to start profiling.
           </p>
         </div>
@@ -142,7 +144,7 @@ export function DatasetsPage() {
       {isError && (
         <div
           role="alert"
-          className="rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+          className="rounded-[10px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
         >
           {loadErrorMessage(error)}
         </div>
@@ -160,14 +162,22 @@ export function DatasetsPage() {
         />
       ) : (
         <>
-          <DatasetGrid
-            datasets={data?.items ?? []}
-            loading={isFetching && !isPending}
-          />
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          >
+            <div className="overflow-hidden rounded-[10px] border border-line bg-surface">
+              <DatasetGrid
+                datasets={data?.items ?? []}
+                loading={isFetching && !isPending}
+              />
+            </div>
+          </motion.div>
 
           <nav
             aria-label="Datasets pagination"
-            className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#6c757d] dark:text-[#a0aec0]"
+            className="flex flex-wrap items-center justify-between gap-3 text-xs text-ink2 dark:text-[#a0aec0]"
           >
             <span>
               {formatInt(total)} dataset{total === 1 ? "" : "s"}

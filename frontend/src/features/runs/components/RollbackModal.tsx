@@ -39,7 +39,7 @@ export interface RollbackModalProps {
 }
 
 /**
- * S6 rollback modal (PRD Section 7, wireframe 1i). The rollback is itself a
+ * S6 rollback modal (PRD Section 7, wireframe 1i, preview.html spec). The rollback is itself a
  * logged version, so the copy states that it can be re-applied, and the reason
  * is mandatory — it goes into the audit trail.
  */
@@ -93,7 +93,7 @@ export function RollbackModal({
         </>
       }
     >
-      <p className="text-sm text-[#1f2937] dark:text-[#f3f4f6]">
+      <p className="text-sm text-ink">
         {rollbackConfirm(version?.n ?? 0, fromStep, toStep)}
       </p>
 
@@ -117,18 +117,18 @@ export function RollbackModal({
             }}
             aria-invalid={Boolean(shownError)}
             className={cx(
-              "block w-full rounded-md border text-sm transition-colors shadow-sm px-3.5 py-2 resize-y",
-              "bg-white dark:bg-[#1a1d21] text-[#1f2937] dark:text-[#f3f4f6]",
-              "placeholder:text-[#adb5bd] dark:placeholder:text-[#6c757d]",
+              "block w-full rounded-lg border text-sm transition-colors shadow-sm px-3.5 py-2 resize-y",
+              "bg-surface text-ink",
+              "placeholder:text-muted",
               shownError
-                ? "border-rose-500 dark:border-rose-500 focus:border-rose-500 focus:ring-rose-500"
-                : "border-[#d1d5db] dark:border-[#374151] focus:border-[#fd6321] focus:ring-[#fd6321]",
+                ? "border-danger focus:border-danger focus:ring-danger"
+                : "border-line focus:border-primary focus:ring-primary",
               "focus:outline-none focus:ring-1",
-              "disabled:cursor-not-allowed disabled:bg-[#f8f9fa] dark:disabled:bg-[#2d3239] disabled:opacity-60"
+              "disabled:cursor-not-allowed disabled:bg-canvas disabled:opacity-60"
             )}
           />
         </FormField>
-        <p className="mt-2 text-right text-xs tabular-nums text-[#6c757d] dark:text-[#a0aec0]">
+        <p className="mt-2 text-right text-xs tabular-nums text-ink2">
           {reason.length}/{ROLLBACK_REASON_MAX_LENGTH}
         </p>
       </div>

@@ -10,12 +10,12 @@ import {
   IconFileTypeCsv,
   IconPlayerPlay,
 } from "@tabler/icons-react";
+import { motion, useReducedMotion } from "motion/react";
 import { useDatasetEvents } from "../../../api/realtime";
 import type { DatasetEvent, ExportFormat, JobStatus, PlanStep } from "../../../api/schema";
 import { usePermission } from "../../../auth/permissions";
 import { cx, formatInt } from "../../../shared/lib/format";
 import { MSG_EXPORT_BLOCKED_TESTS_FAILED } from "../../../shared/constants/messages";
-import { Badge, type BadgeVariant } from "../../../shared/ui/Badge";
 import { Button } from "../../../shared/ui/Button";
 import { Card } from "../../../shared/ui/Card";
 import { DataTable } from "../../../shared/ui/DataTable";
@@ -40,19 +40,18 @@ import { VersionTimeline } from "../components/VersionTimeline";
 
 // PRD S6 copy. The strings the PRD fixes word-for-word come from messages.ts;
 // these are the remaining section headers and column labels.
-const PAGE_TITLE = "Run";
 const BACK_LABEL = "Plan review";
 const LIVE_LABEL = "Live";
 const RECONNECTING_LABEL = "Reconnecting…";
-const STEPS_TITLE = "Live progress";
+const STEPS_TITLE = "Execution progress";
 const STEPS_SUBTITLE = "Progress is pushed by the server; no refresh is needed.";
 const RESULTS_TITLE = "Results";
 const CHECK_LABEL = "Check";
 const SOURCE_LABEL = "Source";
 const OUTPUT_LABEL = "Output";
-const OK_LABEL = "OK";
-const MATCHED_LABEL = "Matched";
-const MISMATCH_LABEL = "Mismatch";
+const OK_LABEL = "Result";
+const MATCHED_LABEL = "Pass";
+const MISMATCH_LABEL = "Fail";
 const RECONCILIATION_TITLE = "Reconciliation";
 const RECONCILIATION_SUBTITLE =
   "Source totals compared with the cleaned output of this version.";
@@ -65,8 +64,8 @@ const EXPORT_SUBTITLE = "Exports are produced from the validated output.";
 const XLSX_LABEL = "XLSX";
 const CSV_LABEL = "CSV";
 const PIPELINE_LABEL = "Pipeline (JSON)";
-const TESTS_TITLE = "Tests";
-const TESTS_SUBTITLE = "Click a tile to see the list of tests.";
+const TESTS_TITLE = "Test summary";
+const TESTS_SUBTITLE = "Generated checks and suite results against the cleaned dataset.";
 const VERSION_LABEL = "Version";
 const ROWS_LABEL = "Rows";
 const COLUMNS_LABEL = "Columns";
@@ -94,18 +93,11 @@ const JOB_STATUS_LABEL: Record<JobStatus, string> = {
   failed: "Failed",
 };
 
-const JOB_STATUS_VARIANT: Record<JobStatus, BadgeVariant> = {
-  queued: "secondary",
-  running: "info",
-  succeeded: "success",
-  failed: "danger",
-};
-
 const PROGRESS_BAR: Record<JobStatus, string> = {
-  queued: "bg-[#adb5bd] dark:bg-[#4b5563]",
-  running: "bg-[#fd6321]",
-  succeeded: "bg-emerald-500 dark:bg-emerald-400",
-  failed: "bg-rose-500 dark:bg-rose-400",
+  queued: "bg-slate-200 dark:bg-slate-700",
+  running: "bg-primary",
+  succeeded: "bg-success",
+  failed: "bg-danger",
 };
 
 /** Events that can advance the step list (execute / validate / rollback jobs). */
@@ -221,24 +213,28 @@ function StepProgressRow({
   const label = JOB_STATUS_LABEL[status];
 
   return (
-    <li className="px-5 py-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="w-6 flex-shrink-0 text-xs font-semibold tabular-nums text-[#6c757d] dark:text-[#a0aec0]">
-            {step.stepNo}
-          </span>
-          <span className="min-w-0 truncate text-sm font-medium text-[#1f2937] dark:text-[#f3f4f6]">
-            {step.summary ?? step.operation.replace(/_/g, " ")}
-          </span>
-        </div>
+    <li className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-3 transition-colors">
+      <strong className="w-5 flex-shrink-0 text-sm font-bold tabular-nums text-ink">
+        {step.stepNo}
+      </strong>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+        {step.summary ?? step.operation.replace(/_/g, " ")}
+      </span>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs tabular-nums text-[#6c757d] dark:text-[#a0aec0]">
-            {status === "queued" ? NO_VALUE : `${progressPct}%`}
-          </span>
-          <Badge variant={JOB_STATUS_VARIANT[status]}>{label}</Badge>
-        </div>
-      </div>
+      <span
+        className={cx(
+          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+          status === "succeeded"
+            ? "bg-emerald-100 text-success"
+            : status === "running"
+              ? "bg-blue-100 text-info"
+              : status === "failed"
+                ? "bg-red-100 text-danger"
+                : "bg-slate-100 text-ink2"
+        )}
+      >
+        {label}
+      </span>
 
       <div
         role="progressbar"
@@ -246,7 +242,7 @@ function StepProgressRow({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={progressPct}
-        className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-[#e9ecef] dark:bg-[#343a40]"
+        className="h-2 w-20 flex-shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"
       >
         <div
           className={cx(
@@ -257,6 +253,10 @@ function StepProgressRow({
           style={{ width: `${progressPct}%` }}
         />
       </div>
+
+      <span className="w-10 text-right text-xs tabular-nums text-ink2">
+        {status === "queued" ? NO_VALUE : `${progressPct}%`}
+      </span>
     </li>
   );
 }
@@ -275,7 +275,7 @@ const reconColumns: ColumnDef<ReconRow, any>[] = [
     id: "checkName",
     header: CHECK_LABEL,
     cell: ({ row }) => (
-      <span className="font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+      <span className="font-medium text-ink">
         {row.original.checkName}
       </span>
     ),
@@ -297,9 +297,13 @@ const reconColumns: ColumnDef<ReconRow, any>[] = [
     header: OK_LABEL,
     cell: ({ row }) =>
       row.original.ok ? (
-        <Badge variant="success">{MATCHED_LABEL}</Badge>
+        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-success">
+          {MATCHED_LABEL}
+        </span>
       ) : (
-        <Badge variant="danger">{MISMATCH_LABEL}</Badge>
+        <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-danger">
+          {MISMATCH_LABEL}
+        </span>
       ),
   },
 ];
@@ -327,7 +331,7 @@ const EXPORT_FORMATS: Array<{ format: ExportFormat; label: string; icon: ReactNo
 // -----------------------------------------------------------------------------
 
 /**
- * S6 Run, tests, versions, rollback (PRD Section 7, wireframe 1i).
+ * S6 Run, tests, versions, rollback (PRD Section 7, wireframe 1i, preview.html spec).
  *
  * The SSE stream `GET /datasets/{id}/events` is opened on mount and closed on
  * unmount by `useDatasetEvents`; it invalidates the plan, validation and version
@@ -338,6 +342,7 @@ export function RunPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const shouldReduceMotion = useReducedMotion();
 
   const planQuery = usePlan(planId);
   const plan = planQuery.data;
@@ -364,8 +369,9 @@ export function RunPage() {
   const validation = validationQuery.data;
   const versions = versionsQuery.data;
   const currentVersion = versions?.find((version) => version.isCurrent) ?? null;
-  const isRunComplete =
-    steps.length > 0 && progress.every((entry) => entry.status === "succeeded");
+  const completedStepsCount = progress.filter((entry) => entry.status === "succeeded").length;
+  const isRunComplete = steps.length > 0 && completedStepsCount === steps.length;
+  const totalRunProgress = steps.length > 0 ? Math.round((completedStepsCount / steps.length) * 100) : 0;
 
   // The screen refreshes when the rollback finishes. realtime.ts already
   // invalidates these keys, but it can only do so when the event names the plan,
@@ -411,8 +417,10 @@ export function RunPage() {
     );
   }
 
+  const runLabel = `Run R-${planId.slice(0, 4)}`;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Button
@@ -420,17 +428,18 @@ export function RunPage() {
             size="sm"
             leftIcon={<IconArrowLeft className="h-4 w-4" aria-hidden="true" />}
             onClick={() => navigate(`/plans/${planId}`)}
+            className="text-xs text-ink2 hover:text-ink"
           >
             {BACK_LABEL}
           </Button>
 
-          <h1 className="mt-1.5 flex flex-wrap items-center gap-3 text-xl font-bold tracking-tight text-[#1f2937] dark:text-[#f3f4f6]">
-            {PAGE_TITLE}
+          <h1 className="mt-1.5 flex flex-wrap items-center gap-3 text-xl font-bold tracking-tight text-ink">
+            {runLabel}
             <StatusBadge status={datasetQuery.data?.status} />
           </h1>
 
-          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6c757d] dark:text-[#a0aec0]">
-            <span>{datasetQuery.data?.name ?? NO_VALUE}</span>
+          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink2">
+            <span>dataset {datasetQuery.data?.name ?? NO_VALUE}</span>
             <span
               role="status"
               className="inline-flex items-center gap-1.5"
@@ -440,8 +449,8 @@ export function RunPage() {
                 className={cx(
                   "h-1.5 w-1.5 rounded-full",
                   isConnected
-                    ? "bg-emerald-500 dark:bg-emerald-400"
-                    : "bg-amber-500 dark:bg-amber-400"
+                    ? "bg-emerald-500"
+                    : "bg-amber-500"
                 )}
                 aria-hidden="true"
               />
@@ -449,37 +458,53 @@ export function RunPage() {
             </span>
           </p>
         </div>
+
+        <div className="flex items-center gap-2">
+          {isRunComplete && (
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-success">
+              Executed
+            </span>
+          )}
+        </div>
       </header>
 
-      {/* 1 — Live progress, then the results once every step is done. */}
-      <Card
-        title={STEPS_TITLE}
-        subtitle={STEPS_SUBTITLE}
-        noPadding
-        headerAction={
-          lastEvent?.message ? (
-            <span className="max-w-[22rem] truncate text-xs text-[#6c757d] dark:text-[#a0aec0]">
-              {lastEvent.message}
-            </span>
-          ) : null
-        }
+      {/* 1 — Execution progress */}
+      <motion.div
+        whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm"
       >
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-ink">{STEPS_TITLE}</h2>
+            <p className="mt-0.5 text-xs text-ink2">{STEPS_SUBTITLE}</p>
+          </div>
+          <span
+            className={cx(
+              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+              isRunComplete
+                ? "bg-emerald-100 text-success"
+                : "bg-blue-100 text-info"
+            )}
+          >
+            {isRunComplete ? "All steps complete" : "In progress"}
+          </span>
+        </div>
+
         {planQuery.isPending ? (
-          <div className="space-y-4 p-5" role="status" aria-label="Loading steps">
+          <div className="space-y-3" role="status" aria-label="Loading steps">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-3/4" />
           </div>
         ) : steps.length === 0 ? (
-          <div className="p-5">
-            <EmptyState
-              icon={<IconPlayerPlay className="h-6 w-6 stroke-[1.5]" aria-hidden="true" />}
-              message="This plan has no steps to run."
-            />
-          </div>
+          <EmptyState
+            icon={<IconPlayerPlay className="h-6 w-6 stroke-[1.5]" aria-hidden="true" />}
+            message="This plan has no steps to run."
+          />
         ) : (
           <>
-            <ul className="divide-y divide-[#e9ecef] dark:divide-[#343a40]">
+            <ul className="space-y-2">
               {steps.map((step, index) => (
                 <StepProgressRow
                   key={step.id}
@@ -490,35 +515,48 @@ export function RunPage() {
               ))}
             </ul>
 
+            <div
+              className="mt-4 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"
+              role="progressbar"
+              aria-label="Overall execution progress"
+              aria-valuenow={totalRunProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${totalRunProgress}%` }}
+              />
+            </div>
+
+            <div className="mt-2 flex items-center justify-between text-xs text-ink2">
+              <span>Progress: {completedStepsCount} of {steps.length} steps completed</span>
+              {isRunComplete && <span>Status: Complete</span>}
+            </div>
+
             {isRunComplete && (
-              <div className="border-t border-[#e9ecef] dark:border-[#343a40] bg-[#f8f9fa] dark:bg-[#1f2327] px-5 py-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#6c757d] dark:text-[#a0aec0]">
+              <div className="mt-4 rounded-lg border border-line bg-canvas p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-ink2">
                   {RESULTS_TITLE}
                 </h3>
                 <dl className="mt-2 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
                   <div>
-                    <dt className="inline text-[#6c757d] dark:text-[#a0aec0]">
-                      {VERSION_LABEL}:{" "}
-                    </dt>
-                    <dd className="inline font-semibold tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+                    <dt className="inline text-ink2">{VERSION_LABEL}: </dt>
+                    <dd className="inline font-semibold tabular-nums text-ink">
                       v{currentVersion?.n ?? 0}
                     </dd>
                   </div>
                   <div>
-                    <dt className="inline text-[#6c757d] dark:text-[#a0aec0]">
-                      {ROWS_LABEL}:{" "}
-                    </dt>
-                    <dd className="inline font-semibold tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+                    <dt className="inline text-ink2">{ROWS_LABEL}: </dt>
+                    <dd className="inline font-semibold tabular-nums text-ink">
                       {formatInt(
                         currentVersion?.rows ?? datasetQuery.data?.rowCount ?? 0
                       )}
                     </dd>
                   </div>
                   <div>
-                    <dt className="inline text-[#6c757d] dark:text-[#a0aec0]">
-                      {COLUMNS_LABEL}:{" "}
-                    </dt>
-                    <dd className="inline font-semibold tabular-nums text-[#1f2937] dark:text-[#f3f4f6]">
+                    <dt className="inline text-ink2">{COLUMNS_LABEL}: </dt>
+                    <dd className="inline font-semibold tabular-nums text-ink">
                       {formatInt(
                         currentVersion?.cols ?? datasetQuery.data?.columnCount ?? 0
                       )}
@@ -526,11 +564,18 @@ export function RunPage() {
                   </div>
                   {validation && (
                     <div>
-                      <Badge variant={validation.latestPassed ? "success" : "danger"}>
+                      <span
+                        className={cx(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                          validation.latestPassed
+                            ? "bg-emerald-100 text-success"
+                            : "bg-red-100 text-danger"
+                        )}
+                      >
                         {validation.latestPassed
                           ? TESTS_PASSED_LABEL
                           : TESTS_FAILED_LABEL}
-                      </Badge>
+                      </span>
                     </div>
                   )}
                 </dl>
@@ -538,35 +583,57 @@ export function RunPage() {
             )}
           </>
         )}
-      </Card>
+      </motion.div>
 
-      {/* 2 — Test tiles; clicking one expands its test list. */}
-      <Card title={TESTS_TITLE} subtitle={TESTS_SUBTITLE}>
-        <TestSummary validation={validation} loading={validationQuery.isPending} />
-      </Card>
-
-      {/* 3 — Reconciliation grid. */}
-      <Card title={RECONCILIATION_TITLE} subtitle={RECONCILIATION_SUBTITLE} noPadding>
-        <div className="p-4">
-          <DataTable
-            columns={reconColumns}
-            data={validation?.reconciliation ?? []}
-            pageSize={10}
-            loading={validationQuery.isPending}
-            emptyMessage={NO_RECONCILIATIONS}
-          />
+      {/* 2 — Test summary */}
+      <motion.div
+        whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm"
+      >
+        <div className="mb-4">
+          <h2 className="text-base font-semibold text-ink">{TESTS_TITLE}</h2>
+          <p className="mt-0.5 text-xs text-ink2">{TESTS_SUBTITLE}</p>
         </div>
-      </Card>
+        <TestSummary validation={validation} loading={validationQuery.isPending} />
+      </motion.div>
 
-      {/* 4 — Exports: hidden while any test failed, with the PRD banner instead. */}
+      {/* 3 — Reconciliation grid */}
+      <motion.div
+        whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm"
+      >
+        <div className="mb-4">
+          <h2 className="text-base font-semibold text-ink">{RECONCILIATION_TITLE}</h2>
+          <p className="mt-0.5 text-xs text-ink2">{RECONCILIATION_SUBTITLE}</p>
+        </div>
+        <DataTable
+          columns={reconColumns}
+          data={validation?.reconciliation ?? []}
+          pageSize={10}
+          loading={validationQuery.isPending}
+          emptyMessage={NO_RECONCILIATIONS}
+        />
+      </motion.div>
+
+      {/* 4 — Exports */}
       {canExport && (
-        <Card title={EXPORT_TITLE} subtitle={EXPORT_SUBTITLE}>
+        <motion.div
+          whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="card rounded-[10px] border border-line bg-surface p-5 shadow-sm"
+        >
+          <div className="mb-4">
+            <h2 className="text-base font-semibold text-ink">{EXPORT_TITLE}</h2>
+            <p className="mt-0.5 text-xs text-ink2">{EXPORT_SUBTITLE}</p>
+          </div>
           {validationQuery.isPending ? (
             <Skeleton className="h-9 w-full max-w-sm" />
           ) : validationQuery.isError ? (
             <div
               role="alert"
-              className="flex items-start gap-3 rounded-md border border-[#f5c6cb] bg-[#f8d7da] px-4 py-3 text-sm text-[#721c24] dark:border-[#662025] dark:bg-[#3d1a1c] dark:text-[#f5a3a9]"
+              className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger"
             >
               <IconAlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
               <span>
@@ -576,33 +643,35 @@ export function RunPage() {
               </span>
             </div>
           ) : validation?.latestPassed ? (
-            <div className="flex flex-wrap gap-3">
-              {EXPORT_FORMATS.map((entry) => (
-                <Button
-                  key={entry.format}
-                  variant="secondary"
-                  onClick={() => void handleExport(entry.format)}
-                  loading={
-                    exportMutation.isPending &&
-                    exportMutation.variables?.format === entry.format
-                  }
-                  disabled={exportMutation.isPending}
-                  leftIcon={entry.icon}
-                >
-                  {entry.label}
-                </Button>
-              ))}
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2.5">
+                {EXPORT_FORMATS.map((entry) => (
+                  <Button
+                    key={entry.format}
+                    variant="secondary"
+                    onClick={() => void handleExport(entry.format)}
+                    loading={
+                      exportMutation.isPending &&
+                      exportMutation.variables?.format === entry.format
+                    }
+                    disabled={exportMutation.isPending}
+                    leftIcon={entry.icon}
+                  >
+                    {entry.label}
+                  </Button>
+                ))}
+              </div>
               {outputTables.length > 0 && (
-                <div className="mt-2 w-full">
-                  <p className="mb-2 text-sm font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+                <div className="mt-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink2">
                     {OUTPUT_TABLES_TITLE}
                   </p>
-                  <ul className="divide-y divide-[#e9ecef] rounded-md border border-[#e9ecef] text-sm dark:divide-[#343a40] dark:border-[#343a40]">
+                  <ul className="divide-y divide-line rounded-lg border border-line text-sm">
                     {outputTables.map((t) => (
-                      <li key={t.name} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <li key={t.name} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                         <span>
-                          <span className="font-mono">{t.name}</span>
-                          <span className="ml-2 text-[#6c757d] dark:text-[#a0aec0]">
+                          <span className="font-mono text-ink">{t.name}</span>
+                          <span className="ml-2 text-xs text-ink2">
                             {outputTableRows(t.rows)}
                           </span>
                         </span>
@@ -622,20 +691,18 @@ export function RunPage() {
               )}
             </div>
           ) : (
-            /* One or more tests failed: the actions are hidden, not disabled
-               (PRD Section 2), and the banner explains why. */
             <div
               role="status"
-              className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+              className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
             >
               <IconAlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
               <span>{MSG_EXPORT_BLOCKED_TESTS_FAILED}</span>
             </div>
           )}
-        </Card>
+        </motion.div>
       )}
 
-      {/* 5 — Version timeline with the rollback modal. */}
+      {/* 5 — Version timeline */}
       <VersionTimeline
         planId={planId}
         versions={versions ?? []}

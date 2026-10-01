@@ -26,7 +26,7 @@ const columns: ColumnDef<Dataset, any>[] = [
     cell: ({ row }) => (
       <Link
         to={`/datasets/${row.original.id}`}
-        className="font-semibold text-[#fd6321] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#fd6321] rounded"
+        className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded"
       >
         {row.original.name}
       </Link>

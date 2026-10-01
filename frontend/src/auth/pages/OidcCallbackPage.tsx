@@ -31,7 +31,7 @@ export function OidcCallbackPage() {
     <main className="flex min-h-screen items-center justify-center p-6 text-sm">
       {error ? (
         <p role="alert">
-          {error} <Link to="/login" className="font-medium text-[#fd6321] underline">Back to sign-in</Link>
+          {error} <Link to="/login" className="font-medium text-primary underline">Back to sign-in</Link>
         </p>
       ) : (
         <p role="status">Signing you in…</p>

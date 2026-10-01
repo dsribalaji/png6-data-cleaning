@@ -77,15 +77,15 @@ export function RadioGroup({
                 }
                 disabled={option.disabled}
                 onChange={() => onChange?.(option.value)}
-                className="h-4 w-4 border-[#d1d5db] dark:border-[#374151] text-[#fd6321] focus:ring-[#fd6321] dark:bg-[#1a1d21]"
+                className="h-4 w-4 border-line dark:border-[#374151] text-primary focus:ring-primary dark:bg-[#1a1d21]"
               />
             </div>
             <div className="text-sm">
-              <span className="font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+              <span className="font-medium text-ink dark:text-[#f3f4f6]">
                 {option.label}
               </span>
               {option.description && (
-                <p className="text-xs text-[#6c757d] dark:text-[#a0aec0] mt-0.5">
+                <p className="text-xs text-ink2 dark:text-[#a0aec0] mt-0.5">
                   {option.description}
                 </p>
               )}

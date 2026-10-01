@@ -125,22 +125,22 @@ export function FileDrop({
   return (
     <div className={cx("space-y-1.5", className)}>
       {label && (
-        <span className="block text-xs font-semibold text-[#1f2937] dark:text-[#f3f4f6]">
+        <span className="block text-xs font-semibold text-ink dark:text-[#f3f4f6]">
           {label}
         </span>
       )}
 
       {selectedFile ? (
-        <div className="flex items-center justify-between rounded-lg border border-[#e9ecef] dark:border-[#343a40] bg-white dark:bg-[#24282e] p-3 shadow-sm">
+        <div className="flex items-center justify-between rounded-lg border border-line dark:border-[#343a40] bg-surface dark:bg-[#24282e] p-3 shadow-sm">
           <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-[#fde8e4] dark:bg-[#3d2420] text-[#fd6321]">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 dark:bg-[#3d2420] text-primary">
               <IconFile className="h-5 w-5" aria-hidden="true" />
             </div>
             <div className="truncate text-left">
-              <p className="truncate text-sm font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+              <p className="truncate text-sm font-medium text-ink dark:text-[#f3f4f6]">
                 {selectedFile.name}
               </p>
-              <p className="text-xs text-[#6c757d] dark:text-[#a0aec0]">
+              <p className="text-xs text-ink2 dark:text-[#a0aec0]">
                 {formatBytes(selectedFile.size)}
               </p>
             </div>
@@ -149,7 +149,7 @@ export function FileDrop({
             <button
               type="button"
               onClick={handleRemove}
-              className="ml-3 rounded-md p-1.5 text-[#6c757d] dark:text-[#a0aec0] hover:bg-[#f2f3f7] dark:hover:bg-[#2d3239] hover:text-[#1f2937] dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321]"
+              className="ml-3 rounded-md p-1.5 text-ink2 dark:text-[#a0aec0] hover:bg-canvas dark:hover:bg-[#2d3239] hover:text-ink dark:hover:text-[#f3f4f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="Remove selected file"
             >
               <IconX className="h-4 w-4" aria-hidden="true" />
@@ -170,12 +170,12 @@ export function FileDrop({
             }
           }}
           className={cx(
-            "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-all cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fd6321]",
+            "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-all cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
             isDragOver
-              ? "border-[#fd6321] bg-[#fde8e4]/30 dark:bg-[#3d2420]/30"
+              ? "border-primary bg-primary/10 dark:bg-[#3d2420]/30"
               : error
-              ? "border-rose-400 bg-rose-50/20 dark:border-rose-700 dark:bg-rose-950/20"
-              : "border-[#d1d5db] dark:border-[#374151] bg-[#f8f9fa]/50 dark:bg-[#1f2327]/30 hover:border-[#fd6321] hover:bg-[#fde8e4]/10 dark:hover:bg-[#3d2420]/10",
+              ? "border-danger bg-danger/10 dark:border-rose-700 dark:bg-rose-950/20"
+              : "border-line dark:border-[#374151] bg-canvas/50 dark:bg-[#1f2327]/30 hover:border-primary hover:bg-primary/5 dark:hover:bg-[#3d2420]/10",
             disabled && "cursor-not-allowed opacity-60 pointer-events-none"
           )}
         >
@@ -188,27 +188,27 @@ export function FileDrop({
             className="hidden"
             tabIndex={-1}
           />
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#fde8e4] dark:bg-[#3d2420] text-[#fd6321] mb-2">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 dark:bg-[#3d2420] text-primary mb-2">
             <IconUpload className="h-5 w-5" aria-hidden="true" />
           </div>
-          <p className="text-sm font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+          <p className="text-sm font-medium text-ink dark:text-[#f3f4f6]">
             Drag and drop file here, or{" "}
-            <span className="text-[#fd6321] hover:underline font-semibold">
+            <span className="text-primary hover:underline font-semibold">
               browse
             </span>
           </p>
-          <p className="mt-1 text-xs text-[#6c757d] dark:text-[#a0aec0]">
+          <p className="mt-1 text-xs text-ink2 dark:text-[#a0aec0]">
             Supported formats: {accept} (Max {maxSizeMb} MB)
           </p>
         </div>
       )}
 
       {hint && !error && (
-        <p className="text-xs text-[#6c757d] dark:text-[#a0aec0]">{hint}</p>
+        <p className="text-xs text-ink2 dark:text-[#a0aec0]">{hint}</p>
       )}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">
+        <p role="alert" className="text-xs font-medium text-danger dark:text-rose-400">
           {error}
         </p>
       )}
