@@ -116,17 +116,6 @@ jobs:
         run: |
           uv run --with httpx python backend/scripts/benchmark.py \
             data/reference/VendorInvoices_uncleaned.xlsx --json benchmark.json
-      # E3: property-based API fuzzing against the running Compose stack. Logs in
-      # as the seeded administrator so the fuzzer reaches the authenticated
-      # routes, then fails the job on ANY 5xx response. Non-5xx OpenAPI contract
-      # findings are reported but not fatal (see scripts/fuzz_api.py for why).
-      - name: API fuzzing (E3, no 5xx allowed)
-        working-directory: backend
-        run: |
-          uv run --extra dev python scripts/fuzz_api.py \
-            --base-url http://localhost:8000 \
-            --json fuzz-report.json \
-            --max-examples 5 --workers 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -139,6 +128,23 @@ jobs:
           mkdir -p ../walkthrough
           BASE=http://localhost:5173 SHOTS=../walkthrough node scripts/live-walkthrough.mjs | tee ../walkthrough/log.txt
           ! grep -q "STOPPED:" ../walkthrough/log.txt
+      # E3: property-based API fuzzing against the running Compose stack. Logs in
+      # as the seeded administrator so the fuzzer reaches the authenticated
+      # routes, then fails the job on ANY 5xx response. Non-5xx OpenAPI contract
+      # findings are reported but not fatal (see scripts/fuzz_api.py for why).
+      #
+      # Deliberately LAST: fuzzing generates thousands of malformed logins, and
+      # the auth lockout (5 failed attempts, 15 minutes) then answers 403 to the
+      # walk-through's real login. Both steps are valid; they just cannot share
+      # an account in this order. The fuzzer must not leave the stack in a state
+      # the walk-through depends on.
+      - name: API fuzzing (E3, no 5xx allowed)
+        working-directory: backend
+        run: |
+          uv run --extra dev python scripts/fuzz_api.py \
+            --base-url http://localhost:8000 \
+            --json fuzz-report.json \
+            --max-examples 5 --workers 2
       - if: always()
         run: docker compose -f deploy/docker-compose.yml logs api worker > compose.log 2>&1 || true
       - if: always()

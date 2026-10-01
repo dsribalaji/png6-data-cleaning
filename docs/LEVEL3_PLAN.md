@@ -209,6 +209,13 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
   reports as B613 `trojansource`. It is now written as an escape: identical bytes, the
   adversarial fixture still tests what it claims to, and the literal no longer visually
   reverses the line for anyone reading the file. Bandit is clean (0 medium, 0 high).
+- **Ordering constraint worth knowing:** fuzzing generates thousands of malformed logins, and
+  the auth lockout (5 failed attempts, 15 minutes) then answers 403 to the browser
+  walk-through's real login. Both steps are correct; they simply cannot share an account in
+  that order, so the fuzzer runs **last** in the e2e job. The lockout working is not a bug.
+- **Second CI run:** fuzzing passes against the real stack — 1168 cases, **0 server errors**,
+  `stop_reason: completed`. The `JsonSchemaError` findings from the local run did not appear,
+  confirming they were the SQLite-only timezone artifact.
 - **Known and deliberately not fatal yet:** ~99 non-5xx findings, all OpenAPI *documentation*
   debt rather than runtime bugs — the app returns every error as `application/problem+json`
   and returns 401/403/404/409 responses the generated spec does not list, and
