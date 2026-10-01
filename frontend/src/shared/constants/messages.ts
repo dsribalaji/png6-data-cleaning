@@ -417,3 +417,7 @@ export const MSG_FLAGGED_CELLS_TITLE = "Cells that look like instructions to an 
 export const MSG_FLAGGED_CELLS_SUBTITLE =
   "These cells are kept in the data but are never sent to an AI model.";
 export const MSG_PLAN_CONFIDENCE = (pct: number | string) => `Plan confidence ${pct}%`;
+
+// S10 evaluation verdict (Level 3 M3 pass bar)
+export const MSG_EVAL_BAR_MET = "Pass bar met";
+export const MSG_EVAL_BAR_MISSED = "Pass bar missed";

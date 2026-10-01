@@ -226,3 +226,32 @@ async def test_planning_public_helpers(test_session: AsyncSession):
     s3, l3 = steps_with_loss[2]
     assert s3.step_no == 3
     assert l3 is None
+
+
+def test_build_steps__one_to_many_between_plain_columns__no_expand_step():
+    """Export was blocked live: an AI one_to_many rule (supplier -> invoices) became an
+    expand_nested on a plain text column, producing an empty child table."""
+    df = pl.DataFrame(
+        {
+            "invoice": ["I1", "I2"],
+            "supplier": ["Acme", "Acme"],
+            "items": ['[{"sku":"1"}]', '[{"sku":"2"}]'],
+        }
+    )
+    profile = TableProfile(
+        table_name="t",
+        row_count=2,
+        column_count=3,
+        columns=[
+            ColumnProfile("invoice", 0, "String", "identifier", 0, 0.0, 2, None, None, None, []),
+            ColumnProfile("supplier", 1, "String", "category", 0, 0.0, 1, None, None, None, []),
+            ColumnProfile("items", 2, "String", "nested_json", 0, 0.0, 2, None, None, None, ["nested_json"]),
+        ],
+        issues=[],
+    )
+    rules = [
+        InferredRule(rule_type="one_to_many", columns=["supplier", "invoice"], expression={}, confidence=0.88),
+        InferredRule(rule_type="one_to_many", columns=["items"], expression={}, confidence=0.95),
+    ]
+    steps = build_steps_from_rules(rules, profile, df)
+    assert [s.parameters["column"] for s in steps if s.operation == "expand_nested"] == ["items"]

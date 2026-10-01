@@ -31,6 +31,8 @@ import {
   MSG_STARTED,
   MSG_START_EVALUATION,
   formatDuration,
+  MSG_EVAL_BAR_MET,
+  MSG_EVAL_BAR_MISSED,
 } from "../../../shared/constants/messages";
 import {
   BENCHMARK_SET_OPTIONS,
@@ -195,6 +197,38 @@ function RunDetailModal({ runId, onClose }: RunDetailModalProps) {
             {isRunning ? MSG_RUNNING : formatPassRate(run.passRate)}
           </dd>
         </dl>
+      )}
+
+      {run && !isRunning && run.passed !== undefined && (
+        <div className="mt-4">
+          <Badge variant={run.passed ? "success" : "danger"}>
+            {run.passed ? MSG_EVAL_BAR_MET : MSG_EVAL_BAR_MISSED}
+          </Badge>
+        </div>
+      )}
+
+      {run && !isRunning && (run.detailedResults?.length ?? 0) > 0 && (
+        <ul className="mt-3 max-h-72 divide-y divide-[#e9ecef] overflow-y-auto rounded-md border border-[#e9ecef] text-sm dark:divide-[#343a40] dark:border-[#343a40]">
+          {run.detailedResults!.map((row) => (
+            <li key={String(row.case)} className="flex items-start justify-between gap-3 px-3 py-2">
+              <span className="min-w-0">
+                <span className="font-mono text-xs">{String(row.case)}</span>
+                {row.details ? (
+                  <span className="block break-words text-xs text-[#6c757d] dark:text-[#a0aec0]">
+                    {String(row.details)}
+                  </span>
+                ) : null}
+              </span>
+              <Badge variant={row.result === "passed" ? "success" : "danger"}>{String(row.result)}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {run?.status === "failed" && run.errorMessage && (
+        <p role="alert" className="mt-3 text-sm text-[#721c24] dark:text-[#f5a3a9]">
+          {run.errorMessage}
+        </p>
       )}
 
       {detailQuery.isError && (

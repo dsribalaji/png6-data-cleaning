@@ -516,6 +516,11 @@ export interface EvaluationRun {
   durationSeconds?: number;
   finishedAt?: string | null;
   scores?: Record<string, unknown>;
+  /** "pending" | "running" | "succeeded" | "failed" (backend run status). */
+  status?: string;
+  errorMessage?: string | null;
+  /** The benchmark's own verdict: every check met its pass bar. */
+  passed?: boolean;
 }
 
 export interface EvaluationRunDetail extends EvaluationRun {

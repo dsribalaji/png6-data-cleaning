@@ -52,10 +52,61 @@ export const EVALUATION_POLL_MS = 2_000;
  * status field on the contract.
  */
 export function isEvaluationRunning(
-  run: Pick<EvaluationRun, "finishedAt"> | null | undefined
+  run: Pick<EvaluationRun, "finishedAt" | "status"> | null | undefined
 ): boolean {
+  // A failed run may never get finishedAt; its status still ends the polling.
+  if (run?.status === "succeeded" || run?.status === "failed") return false;
   if (!run) return false;
   return !run.finishedAt;
+}
+
+interface RawCase {
+  caseId: string;
+  crashed?: boolean;
+  error?: string | null;
+  failures?: unknown[];
+  rowCount?: number;
+  durationMs?: number;
+}
+
+/**
+ * API -> view model. The backend sends `scores = { checks, cases, passed, llm_on }`;
+ * the screen shows a pass rate (share of benchmark cases with no failures), a
+ * duration, and one result row per case.
+ */
+export function toEvaluationRun(raw: EvaluationRunDetail): EvaluationRunDetail {
+  const scores = (raw.scores ?? {}) as {
+    cases?: RawCase[];
+    passed?: boolean;
+    llm_on?: boolean;
+  };
+  const cases = Array.isArray(scores.cases) ? scores.cases : [];
+  const ok = cases.filter((c) => !c.crashed && (c.failures?.length ?? 0) === 0).length;
+  const start = raw.startedAt ? Date.parse(raw.startedAt) : NaN;
+  const end = raw.finishedAt ? Date.parse(raw.finishedAt) : NaN;
+  return {
+    ...raw,
+    benchmarkSetName:
+      raw.benchmarkSetName ?? (cases.length ? `Labelled benchmark (${cases.length} cases)` : undefined),
+    modelName: raw.modelName ?? (scores.llm_on ? "AI on" : "Deterministic (AI off)"),
+    passRate: raw.passRate ?? (cases.length ? ok / cases.length : undefined),
+    durationSeconds:
+      raw.durationSeconds ?? (Number.isFinite(start) && Number.isFinite(end) ? (end - start) / 1000 : undefined),
+    passed: raw.passed ?? scores.passed,
+    detailedResults:
+      raw.detailedResults ??
+      cases.map((c) => ({
+        case: c.caseId,
+        result: c.crashed ? "crashed" : (c.failures?.length ?? 0) === 0 ? "passed" : "failed",
+        rows: c.rowCount ?? 0,
+        details: c.error ?? (c.failures ?? []).map(String).join("; "),
+      })),
+  };
+}
+
+/** GET /evaluations answers a page `{ items, ... }`; older builds sent a bare array. */
+function toEvaluationRuns(raw: { items: EvaluationRunDetail[] } | EvaluationRunDetail[]): EvaluationRun[] {
+  return (Array.isArray(raw) ? raw : raw.items ?? []).map(toEvaluationRun);
 }
 
 /**
@@ -67,7 +118,10 @@ export function isEvaluationRunning(
 export function useEvaluations(): UseQueryResult<EvaluationRun[], ApiError> {
   return useQuery<EvaluationRun[], ApiError>({
     queryKey: evaluationKeys.list,
-    queryFn: () => api.get("evaluations").json<EvaluationRun[]>(),
+    queryFn: async () =>
+      toEvaluationRuns(
+        await api.get("evaluations").json<{ items: EvaluationRunDetail[] } | EvaluationRunDetail[]>()
+      ),
     refetchInterval: (query) => {
       const runs = query.state.data;
       return Array.isArray(runs) && runs.some(isEvaluationRunning)
@@ -86,7 +140,8 @@ export function useEvaluation(
 ): UseQueryResult<EvaluationRunDetail, ApiError> {
   return useQuery<EvaluationRunDetail, ApiError>({
     queryKey: evaluationKeys.detail(id ?? ""),
-    queryFn: () => api.get(`evaluations/${id}`).json<EvaluationRunDetail>(),
+    queryFn: async () =>
+      toEvaluationRun(await api.get(`evaluations/${id}`).json<EvaluationRunDetail>()),
     enabled: Boolean(id),
     refetchInterval: (query) =>
       isEvaluationRunning(query.state.data) ? EVALUATION_POLL_MS : false,
@@ -122,7 +177,9 @@ export function useStartEvaluation(): UseStartEvaluationResult {
   return useMutation<EvaluationRun, ApiError, StartEvaluationVariables>({
     mutationFn: async ({ benchmarkSet }) => {
       const body = { benchmarkSet } as unknown as StartEvaluationRequest;
-      return api.post("evaluations", { json: body }).json<EvaluationRun>();
+      return toEvaluationRun(
+        await api.post("evaluations", { json: body }).json<EvaluationRunDetail>()
+      );
     },
     onSuccess: (run) => {
       // Seed the detail cache so the modal shows the run immediately, then let

@@ -352,6 +352,16 @@ def build_steps_from_rules(
                 )
 
     # 6. expand_nested (one_to_many)
+    # Only columns the profile found to hold nested JSON can be expanded. A one-to-many
+    # rule between two plain columns (the AI infers e.g. supplier -> invoices) is a
+    # relationship, not nesting; expanding it gives an empty child table, fails its
+    # generated test and blocks export.
+    nested_cols = {
+        getattr(c, "column_name", None) or getattr(c, "name", None)
+        for c in columns_info
+        if getattr(c, "semantic_type", "") == "nested_json"
+        or "nested_json" in (getattr(c, "flags", None) or [])
+    }
     nested_steps: list[StepCandidate] = []
     for r in rules:
         if getattr(r, "rule_type", None) == "one_to_many":
@@ -359,6 +369,8 @@ def build_steps_from_rules(
             expr = getattr(r, "expression", {})
             c_name = cols[0] if cols else expr.get("column")
             if not c_name or c_name not in df.columns or c_name in seen_drop_cols:
+                continue
+            if c_name not in nested_cols:
                 continue
             child_tbl = expr.get("child_table") or "".join(
                 p.capitalize() for p in c_name.split("_") if p
