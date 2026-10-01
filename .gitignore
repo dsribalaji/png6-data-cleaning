@@ -28,6 +28,11 @@ dist/
 *.db
 *.db-journal
 backend/storage/
+
+# Schemathesis local cache (E3 API fuzzing); the JSON/JUnit report is uploaded
+# as a CI artifact instead of being committed.
+backend/.schemathesis/
+schemathesis-report/
 frontend/tsconfig.tsbuildinfo
 
 # NOTE: keep Alembic migration files tracked (do NOT ignore backend/alembic/versions/).

@@ -65,10 +65,20 @@ async def create_evaluation(
     await session.commit()
     await session.refresh(run)
 
-    # Import inside the service function to avoid hard import cycles
-    from planner.modules.evaluation import tasks as _tasks
+    # Import inside the service function to avoid hard import cycles.
+    # dispatch_task, not run_evaluation.delay(): in eager mode (CELERY_TASK_ALWAYS_EAGER,
+    # the default) delay() runs the task inline on this event loop, and the task body
+    # calls asyncio.run(), which raises "asyncio.run() cannot be called from a running
+    # event loop" and surfaced as a 500 from POST /api/v1/evaluations. dispatch_task
+    # sends from a worker thread, which is what every other module already uses.
+    from planner.worker import dispatch_task
 
-    _tasks.run_evaluation.delay(str(run.id))
+    await dispatch_task(
+        "evaluation.run_evaluation",
+        kwargs={"run_id": str(run.id)},
+        queue="eval",
+        wait=False,
+    )
 
     # Audit: call record_audit per specification (stub owned by worker W1)
     await record_audit(

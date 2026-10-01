@@ -167,8 +167,47 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
   "id/number/code" — was fixed with a shape test rather than another name test.
 - **Scores (model off):** 18 cases, 0 crashes, quarantine recall 1.0, quarantine precision 1.0,
   injection flag rate 1.0, rule recall 1.0. Backend suite 231 tests pass.
-- **Still to do in M3:** B7 (cross-field fill, FR-019), B9 (prompt versioning `*.v2`), E3
-  (schemathesis API fuzzing).
+- **Still to do in M3:** B7 (cross-field fill, FR-019), B9 (prompt versioning `*.v2`).
+
+## 4e. M3b progress (2026-10-01) — E3 API fuzzing
+
+- **E3 done.** `backend/scripts/fuzz_api.py` logs in as the seeded administrator, then runs
+  `schemathesis` against the live `/api/docs/openapi.json` with a real bearer token, so the
+  fuzzer reaches the authenticated routes rather than bouncing off 401s. The e2e job runs it
+  against the Compose stack and uploads `fuzz-report.json` + `fuzz-report.xml` as an artifact.
+  The gate is the E3 line: **any 5xx fails the job.**
+- **Two real 500s found and fixed** (this is the point of the exercise):
+  - `POST /api/v1/evaluations` returned 500 in the default eager mode
+    (`CELERY_TASK_ALWAYS_EAGER=true`): the service called `run_evaluation.delay()`, which runs
+    the task inline on the request's event loop, and the task body calls `asyncio.run()` —
+    "asyncio.run() cannot be called from a running event loop". Every other module already
+    went through `worker.dispatch_task`, which sends from a worker thread; the evaluation
+    module was the one that did not. Fixed in `create_evaluation/service.py`.
+  - A follow-on: the first fix dispatched the wrong task name, so runs stayed `pending`
+    forever instead of failing loudly. Two things came out of it — the task is registered as
+    `evaluation.run_evaluation`, not its module path; and `dispatch_task(wait=False)` now logs
+    a failed background dispatch instead of dropping the exception, so a fire-and-forget job
+    that never starts is explainable.
+- **The fuzzer is proven to fail when it should:** a temporary route that raises was added to
+  `main.py`, the fuzzer reported `ServerError: 1` and the script exited 1; the route was then
+  removed and `main.py` restored byte-identical.
+- **Current result:** 39 operations, 1164 generated cases, **0 crashes / 0 server errors**,
+  run completes (`stop_reason: completed`, not an early stop). Backend suite: 231 passed.
+- **Known and deliberately not fatal yet:** ~99 non-5xx findings, all OpenAPI *documentation*
+  debt rather than runtime bugs — the app returns every error as `application/problem+json`
+  and returns 401/403/404/409 responses the generated spec does not list, and
+  `response_schema_conformance` reports timestamps without a timezone offset. The offset issue
+  is a **SQLite-only artifact** (SQLite drops tzinfo on read; the Compose stack runs Postgres,
+  which preserves it), so it should not appear in CI. They are reported and archived, not
+  silently dropped: `--fail-on all` turns them into a gate once the spec is updated.
+- **E2 job change:** CI's `.env` copied the `FERNET_KEY=change-me` placeholder, which made
+  `PUT /api/v1/model-config` answer 500 (`CONFIGURATION_ERROR`, a documented and unit-tested
+  response). The e2e job now generates a real Fernet key for the run, as it already did for
+  `JWT_SECRET`.
+
+- **Still open in M3:** B7 (the `cross_field_fill` rule, the `fill_missing` op and the plan
+  step all exist in code, but there is no golden test on the reference file), B9
+  (`infer_rules.v2` / `propose_steps.v2` prompts do not exist).
 
 ## 5. Order
 

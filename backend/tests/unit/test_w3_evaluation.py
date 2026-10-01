@@ -139,16 +139,18 @@ async def test_create_evaluation__default_benchmark__enqueues_and_pending(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Create evaluation without benchmarkSetId creates default set and enqueues task."""
-    enqueued_run_id: str | None = None
+    dispatched: dict[str, object] = {}
 
-    def fake_delay(run_id_arg: str) -> MagicMock:
-        nonlocal enqueued_run_id
-        enqueued_run_id = run_id_arg
-        return MagicMock()
+    async def fake_dispatch_task(name: str, **kwargs: object) -> None:
+        dispatched["name"] = name
+        dispatched.update(kwargs)
 
-    import planner.modules.evaluation.tasks as tasks_module
+    # The service dispatches through worker.dispatch_task, not run_evaluation.delay():
+    # in eager mode delay() runs the task on this event loop and the task's own
+    # asyncio.run() raises, which surfaced as a 500 from POST /api/v1/evaluations.
+    import planner.worker as worker_module
 
-    monkeypatch.setattr(tasks_module.run_evaluation, "delay", fake_delay)
+    monkeypatch.setattr(worker_module, "dispatch_task", fake_dispatch_task)
 
     out = await create_evaluation(
         session,
@@ -158,7 +160,9 @@ async def test_create_evaluation__default_benchmark__enqueues_and_pending(
     )
 
     assert out.status == "pending"
-    assert str(out.id) == enqueued_run_id
+    # The name must be the registered Celery task name, not the module path.
+    assert dispatched["name"] == "evaluation.run_evaluation"
+    assert dispatched["kwargs"] == {"run_id": str(out.id)}
 
     # Verify run row exists in DB with status pending
     run = await get_run(session, out.id)
