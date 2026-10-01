@@ -46,6 +46,17 @@ class Settings(BaseSettings):
     environment: str = "local"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
 
+    @field_validator("jwt_secret", mode="after")
+    @classmethod
+    def _jwt_secret_long_enough(cls, v: str) -> str:
+        # RFC 7518 §3.2: an HS256 key must be at least 256 bits.
+        if len(v.encode()) < 32 or v.startswith("replace-with-"):  # .env.example placeholder
+            raise ValueError(
+                "JWT_SECRET must be at least 32 bytes; generate one with "
+                '`python -c "import secrets; print(secrets.token_urlsafe(48))"`'
+            )
+        return v
+
     @field_validator("cors_origins", mode="after")
     @classmethod
     def _parse_cors_origins(cls, v: list[str] | str) -> list[str]:

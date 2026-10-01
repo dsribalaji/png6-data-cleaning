@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import planner.llm.gateway as gateway
 from planner.core.audit import record_audit
+from planner.llm.gateway import ResolvedModelConfig
 from planner.modules.model_config.crypto import decrypt_credential
 from planner.modules.model_config.errors import (
     MODEL_CONFIG_NOT_FOUND,
@@ -19,22 +20,6 @@ from planner.modules.model_config.features.test_model_connection.schemas import 
     TestModelConnectionOut,
 )
 from planner.modules.model_config.models import ModelConfig
-from planner.modules.model_config.public import ResolvedModelConfig
-
-
-if not hasattr(gateway, "LlmConnectionError"):
-
-    class _LlmConnectionError(AppError):
-        """Raised when provider connection test fails."""
-
-        def __init__(self, message: str | None = None) -> None:
-            super().__init__(
-                code="MODEL_CONNECTION_FAILED",
-                message=message or "Could not reach the provider. Check the key and endpoint.",
-                status=422,
-            )
-
-    gateway.LlmConnectionError = _LlmConnectionError  # type: ignore[attr-defined]
 
 
 async def test_model_connection(
