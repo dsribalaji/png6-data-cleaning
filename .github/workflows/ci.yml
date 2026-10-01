@@ -34,21 +34,10 @@ jobs:
       - run: uv run ruff check src tests --select F821,F811,E9
       - run: uv run pytest -q
       # C3: the evaluation pass bar (decision.md D5) with the model OFF, so it is
-      # deterministic and free. Fails the build if quarantine recall, the injection
+      # deterministic and free. Exits non-zero if quarantine recall, the injection
       # flag rate or rule recall drops, or if any case crashes.
       - name: Evaluation pass bar (C3, model off)
-        run: |
-          uv run python -c "
-          import json
-          from planner.engine.evaluation import bar_report, run_benchmark
-          report = run_benchmark(llm_on=False)
-          for row in bar_report(report['metrics']):
-              print(f\"{row['check']:<22} {row['actual']:>8} {row['direction']} {row['bar']}  {'PASS' if row['passed'] else 'FAIL'}\")
-          print('cases:', report['metrics']['cases'], 'crashes:', report['metrics']['crashes'])
-          with open('evaluation-report.json', 'w') as fh:
-              json.dump(report, fh, indent=2, default=str)
-          raise SystemExit(0 if report['passed'] else 1)
-          "
+        run: uv run python scripts/evaluate_benchmark.py --fail-under-bar --json evaluation-report.json
       - if: always()
         uses: actions/upload-artifact@v4
         with:
