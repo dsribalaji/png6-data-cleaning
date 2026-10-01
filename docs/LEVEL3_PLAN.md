@@ -125,7 +125,7 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
   - image: build, trivy scan, then push to GHCR from `main`
 
   Local calibration: bandit has 0 medium or high findings; pip-audit has 0 known vulnerabilities; npm audit has 0 high (3 moderate, dev only). Gitleaks and trivy have not been run locally; their first CI run will show any findings.
-- **Not yet:** CI has not run (it needs the push). After the first green run, make the four checks required on `main` (GitHub branch protection; a repository setting, not code).
+- **CI is green** as of 2026-10-01, run 36799571412: backend, frontend, security, e2e and image all pass, and the image is published to `ghcr.io/dsribalaji/png6-planner:<sha>`. The first runs found three real problems, all fixed: a duplicate import, an action tag that no longer existed, and 6 HIGH OpenSSL CVEs in the base image (the Dockerfile now applies Debian security updates). **Still to do:** make the checks required on `main` (GitHub branch protection, a repository setting).
 - **D-3 done:** `tests/api/test_route_auth_coverage.py` walks all 43 routes; any route without an auth dependency that is not on the public allowlist fails the build.
 - **D-8 done:** the app refuses to start with a JWT key under 32 bytes or with the `.env.example` placeholder (`tests/unit/test_config_jwt_secret.py`); the local `.env` key was rotated. The refresh endpoint's `X-Requested-With` check was confirmed in code and in the frontend.
 - Lint debt is too large to gate fully today: 97 B008, 54 blind-except and others (about 300 findings; 57 files not ruff-formatted). CI gates only on undefined names and syntax errors. Ratchet the rest per file.
