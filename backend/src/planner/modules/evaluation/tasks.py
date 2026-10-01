@@ -12,6 +12,7 @@ from sqlalchemy import select
 from planner.core.db import SessionLocal
 from planner.core.events import EventType
 from planner.core.outbox import add_event
+from planner.engine.evaluation import bar_report, run_benchmark
 from planner.modules.evaluation import adversarial
 from planner.modules.evaluation.models import EvaluationRun
 # NOTE: W1 must ensure this module is imported at worker startup so tasks are registered.
@@ -69,15 +70,53 @@ async def _run_evaluation_async(
         await session.commit()
 
         try:
-            scores = adversarial.run_adversarial_suite()
+            # C2: the labelled benchmark corpus and its scorer are the real
+            # measurement (quarantine precision/recall, injection flag rate, rule
+            # recall, crashes). The legacy in-code adversarial suite is kept as a
+            # sub-result so nothing that depended on it is lost.
+            report = run_benchmark(llm_on=run.model_config_id is not None)
+            scores: dict[str, Any] = {
+                "metrics": report["metrics"],
+                "bar": report["bar"],
+                "checks": bar_report(report["metrics"]),
+                "passed": report["passed"],
+                "llm_on": report["llm_on"],
+                "cases": [
+                    {
+                        "caseId": c["case_id"],
+                        "tags": c["tags"],
+                        "rowCount": c["row_count"],
+                        "quarantinedRows": c["quarantined_rows"],
+                        "flaggedCells": c["flagged_cells"],
+                        "ruleTypes": c["rule_types"],
+                        "crashed": c["crashed"],
+                        "error": c["error"],
+                        "failures": c["failures"],
+                        "durationMs": c["duration_ms"],
+                    }
+                    for c in report["cases_detail"]
+                ],
+                "legacy": adversarial.run_adversarial_suite(),
+            }
             finished_now = datetime.now(timezone.utc)
             run.scores = scores
             run.status = "succeeded"
             run.finished_at = finished_now
+            # contracts/events/evaluation.completed.schema.json requires a numeric
+            # passRate; the boolean `passed` it used to carry is not in the contract.
+            # Cases that matched their ground truth, over all cases run.
+            case_rows = [
+                c for c in report["cases_detail"] if not c["crashed"] and not c["failures"]
+            ]
+            pass_rate = (
+                round(len(case_rows) / len(report["cases_detail"]), 4)
+                if report["cases_detail"]
+                else 0.0
+            )
             await add_event(
                 session,
                 EventType.EVALUATION_COMPLETED,
-                {"evaluationId": str(run.id), "passed": scores["passed"]},
+                {"evaluationId": str(run.id), "passRate": pass_rate},
             )
             await session.commit()
             return scores

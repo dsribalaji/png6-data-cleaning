@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 import polars as pl
@@ -22,6 +23,24 @@ INJECTION_PATTERNS: list[str] = [
 INJECTION_REGEX = "(?is)" + "|".join(f"(?:{p})" for p in INJECTION_PATTERNS)
 _COMPILED = re.compile(INJECTION_REGEX)
 
+# Zero-width joiners/spaces, bidi overrides and the BOM: invisible in a spreadsheet
+# yet enough to split a keyword apart so a literal substring scan misses it.
+_ZERO_WIDTH = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
+
+
+def normalise_for_scan(value: str) -> str:
+    """Fold away the tricks that hide an instruction from a literal scan.
+
+    Removes zero-width and bidi control characters, then applies Unicode NFKC so
+    full-width and mathematical letters become plain ASCII. Without this the same
+    instruction can be written in a form no regex on the raw text will match
+    (FR-045). The caller still matches against the ORIGINAL value, so the flag
+    keeps the real text for display.
+    """
+    stripped = _ZERO_WIDTH.sub("", value)
+    stripped = "".join(c for c in stripped if unicodedata.category(c) != "Cf")
+    return unicodedata.normalize("NFKC", stripped)
+
 
 @dataclass
 class InjectionFlag:
@@ -41,7 +60,7 @@ def scan_prompt_injection(cells: list[tuple[str, int, str]]) -> list[InjectionFl
         if val is None:
             continue
         val_str = str(val)
-        m = _COMPILED.search(val_str)
+        m = _COMPILED.search(normalise_for_scan(val_str))
         if m:
             flags.append(
                 InjectionFlag(
@@ -60,11 +79,22 @@ def scan_frame(df: pl.DataFrame, limit: int = 200) -> list[InjectionFlag]:
     for col in df.columns:
         if df.schema[col] != pl.Utf8:
             continue
+        # The vectorised regex cannot normalise, so it is used as a cheap
+        # prefilter on the RAW text; normalise_for_scan below makes the final
+        # decision, which is what catches zero-width and full-width spellings.
         hits = (
             df.select(pl.col(col))
             .with_row_index("_row")
-            .filter(pl.col(col).str.contains(INJECTION_REGEX))
-            .head(limit - len(flags))
+            .filter(
+                pl.col(col).str.contains(INJECTION_REGEX)
+                | pl.col(col).map_elements(
+                    lambda v: bool(_COMPILED.search(normalise_for_scan(v)))
+                    if isinstance(v, str)
+                    else False,
+                    return_dtype=pl.Boolean,
+                )
+            )
+            .head(max(limit - len(flags), 0))
         )
         flags += scan_prompt_injection(
             [(col, int(r), v) for r, v in zip(hits["_row"], hits[col], strict=True)]

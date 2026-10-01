@@ -145,6 +145,31 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
 - **Found and fixed:** the Profile page never showed inferred rules. The API returns `{items}`, but the frontend treated it as an array, so it always showed "No rules were inferred".
 - **Not yet verified against a real model:** every AI path is covered by unit tests with fakes. An end-to-end run with Groq needs `GROQ_API_KEY` in `.env`, or a key saved in Model settings.
 
+## 4d. M3 progress (2026-10-01)
+
+- **C1 done.** `engine/evaluation/corpus.py` holds 18 labelled cases, each with the ground truth
+  the scorer compares against: two non-invoice domains (HR, inventory) proving FR-050, ragged
+  rows, plain and obfuscated prompt injection, a 95% sparse column, mixed date and currency
+  formats, entity variants, duplicate rows, CSV formula injection, duplicate and blank headers,
+  an empty file, Latin-1 bytes, a UTF-8 BOM, 100 kB cells, a nested JSON column, padding rows and
+  an all-null column.
+- **C2 done.** `engine/evaluation/scorer.py` runs every case through the real ingest, profiling,
+  inference and guard code and reports crashes, quarantine precision and recall, injection flag
+  rate, rule recall and per-case detail. `POST /evaluations` returns it; the legacy in-code suite
+  is retained as a sub-result.
+- **C3 done.** The D5 bar runs as a CI step with the model off (deterministic, free) and fails the
+  build on any regression. `tests/unit/test_evaluation_benchmark.py` (16 tests) also asserts the
+  bar, corpus coverage and per-case ground truth.
+- **Four real defects found and fixed:** duplicate header names crashed ingest (Polars
+  `DuplicateError`); a UTF-8 BOM was glued to the first column name; full-width and zero-width
+  injection text evaded the guard; Latin-1 bytes quarantined the whole file. A fifth gap — a
+  near-unique code-shaped column was only treated as a key when its name contained
+  "id/number/code" — was fixed with a shape test rather than another name test.
+- **Scores (model off):** 18 cases, 0 crashes, quarantine recall 1.0, quarantine precision 1.0,
+  injection flag rate 1.0, rule recall 1.0. Backend suite 231 tests pass.
+- **Still to do in M3:** B7 (cross-field fill, FR-019), B9 (prompt versioning `*.v2`), E3
+  (schemathesis API fuzzing).
+
 ## 5. Order
 
 Each milestone ends with a tested, working state. The pipeline goes first so that everything after it ships through CI.

@@ -302,7 +302,9 @@ async def test_tasks__run_evaluation__transitions_to_succeeded_and_emits_event(
         outbox_event = result.scalars().first()
         assert outbox_event is not None
         assert outbox_event.payload.get("evaluationId") == run_id_str
-        assert outbox_event.payload.get("passed") is True
+        # contracts/events/evaluation.completed.schema.json declares a numeric
+        # passRate (required); the old boolean `passed` is not in the contract.
+        assert outbox_event.payload.get("passRate") == 1.0
 
     # Idempotency: re-running against already succeeded run should exit early
     second_run = await _run_evaluation_async(run_id_str, session_factory=session_factory)

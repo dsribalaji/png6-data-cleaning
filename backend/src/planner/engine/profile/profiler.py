@@ -84,6 +84,26 @@ def _check_date_strings(values: list[Any]) -> bool:
     return (parsed_count / len(values)) >= 0.8
 
 
+# A short alphanumeric token with an internal separator or digit run, e.g.
+# "SKU-1001", "EMP-001", "PO-1424". Shape-based on purpose: it must recognise a
+# key column whatever the dataset calls it (FR-050), so the column NAME is not
+# part of the test.
+_CODE_LIKE = re.compile(r"^[A-Za-z]{1,10}[-_ ]?\d{2,12}$")
+
+
+def _check_code_strings(values: list[Any]) -> bool:
+    """True when most values look like codes rather than prose or amounts.
+
+    Used to recognise an identifier column whose name carries no hint
+    ("sku", "ref"), which a name-based rule misses.
+    """
+    sample = [str(v).strip() for v in values if v is not None and str(v).strip()]
+    if not sample:
+        return False
+    hits = sum(1 for v in sample if _CODE_LIKE.match(v))
+    return hits / len(sample) >= 0.9
+
+
 def _check_boolean_strings(values: list[Any]) -> bool:
     allowed = {"true", "false", "0", "1", "yes", "no", "t", "f", "y", "n"}
     return all(str(v).strip().lower() in allowed for v in values)
@@ -149,6 +169,10 @@ def profile_table(df: pl.DataFrame, table_name: str = "dataset") -> TableProfile
             elif _check_date_strings(sample_values):
                 semantic_type = "date"
             elif is_id_name and distinct_ratio > 0.9:
+                semantic_type = "identifier"
+            elif distinct_ratio > 0.9 and _check_code_strings(sample_values):
+                # A near-unique column of code-shaped values is a key even when
+                # its name says nothing ("sku", "ref", "code_ref").
                 semantic_type = "identifier"
             elif distinct_count == 2 and _check_boolean_strings(sample_values):
                 semantic_type = "boolean"

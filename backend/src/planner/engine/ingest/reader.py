@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import csv
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import openpyxl
 import polars as pl
+
+# A UTF-8 BOM decoded as text is U+FEFF. Left in place it becomes part of the
+# first column name, so every later reference to that column misses.
+_BOM = "﻿"
+
+
 
 
 @dataclass
@@ -25,6 +32,29 @@ class IngestResult:
     quarantine: list[QuarantinedRow] = field(default_factory=list)
 
 
+def _strip_invisible(text: str) -> str:
+    """Drop zero-width, bidi and other Unicode format characters (category Cf).
+
+    They are invisible in the UI but still make two visually identical column
+    names compare unequal, so every later reference to the second one would miss.
+    Selected by category rather than an explicit list, to cover the whole range.
+    """
+    return "".join(c for c in text if unicodedata.category(c) != "Cf")
+
+
+def _clean_header_name(raw: str) -> str:
+    """Normalise one header cell into a safe, unique-able column name.
+
+    Strips the BOM, zero-width and bidi controls, normalises Unicode (NFKC folds
+    full-width letters to ASCII), then falls back to a generic name if nothing is
+    left. A duplicate name is made unique by the caller, not here.
+    """
+    name = _strip_invisible(raw.lstrip(_BOM))
+    name = unicodedata.normalize("NFKC", name)
+    name = name.strip()
+    return name or "unnamed"
+
+
 def _is_cell_empty(val: Any) -> bool:
     if val is None:
         return True
@@ -41,14 +71,13 @@ def _malformed_reason(row: list[Any], header_width: int) -> str | None:
     """Why a row cannot be parsed against the header, or None if it can (FR-044).
 
     Generic rules only (FR-050): a row is malformed when it has data beyond the
-    header (a shifted or ragged row) or text that failed to decode. A missing
-    value is NOT malformed; it stays in the table as null.
+    header (a shifted or ragged row). A missing value is NOT malformed; it stays
+    in the table as null. Undecodable bytes are NOT a reason to drop a row: the
+    reader decodes with errors="replace", so one bad byte keeps its cell (FR-044).
     """
     extra = [c for c in row[header_width:] if not _is_cell_empty(c)]
     if extra:
         return f"Row has {len(extra)} more cell(s) than the header has columns"
-    if any(isinstance(c, str) and "\ufffd" in c for c in row):
-        return "Row contains characters that could not be decoded"
     return None
 
 
@@ -93,7 +122,31 @@ def _process_tabular_data(
         if _is_cell_empty(h):
             headers.append(f"unnamed_{out_idx}")
         else:
-            headers.append(str(h).strip())
+            headers.append(_clean_header_name(str(h)))
+
+    # 3b. Repeated names must not silently collapse two columns into one. Polars
+    # raises DuplicateError on a frame with the same name twice, so disambiguate
+    # the later occurrences with a numeric suffix (FR-044: never crash).
+    seen: dict[str, int] = {}
+    deduped: list[str] = []
+    for name in headers:
+        if name in seen:
+            seen[name] += 1
+            candidate = f"{name}_{seen[name]}"
+            while candidate in seen:
+                seen[name] += 1
+                candidate = f"{name}_{seen[name]}"
+            seen[candidate] = 0
+            deduped.append(candidate)
+        else:
+            seen[name] = 0
+            deduped.append(name)
+    if deduped != headers:
+        renamed = sum(1 for a, b in zip(headers, deduped) if a != b)
+        duplicate_note = f"{renamed} duplicate column name(s) renamed to keep both columns"
+    else:
+        duplicate_note = ""
+    headers = deduped
 
     # 4. Filter cells to retained columns
     table_rows = [
@@ -102,6 +155,8 @@ def _process_tabular_data(
 
     # 5. Build Polars DataFrames
     warnings: list[str] = []
+    if duplicate_note:
+        warnings.append(duplicate_note)
     if table_rows:
         table_df = pl.DataFrame(table_rows, schema=headers, orient="row")
     else:
@@ -191,7 +246,9 @@ def read_workbook(path: str | Path, sheet: str | int = 0) -> IngestResult:
 
 def read_csv(path: str | Path) -> IngestResult:
     path_obj = Path(path)
-    with path_obj.open("r", encoding="utf-8", errors="replace") as f:
+    # utf-8-sig drops a leading BOM; errors="replace" turns undecodable bytes into
+    # U+FFFD so a single bad byte cannot abort the whole file (FR-044).
+    with path_obj.open("r", encoding="utf-8-sig", errors="replace", newline="") as f:
         reader = csv.reader(f)
         all_rows = list(reader)
 

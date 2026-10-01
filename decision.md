@@ -2,6 +2,39 @@
 
 Newest first. Each entry: date, decider, decision, rationale, status (active / superseded / proposed).
 
+## 2026-10-01 — Level 3 M3: labelled evaluation benchmark, scorer and CI pass bar (C1, C2, C3)
+
+**Decision:** Replace the three in-code adversarial fixtures with a labelled benchmark
+corpus of 18 cases in `backend/src/planner/engine/evaluation/corpus.py`, score them with
+`scorer.py`, and enforce the D5 pass bar in CI with the model switched off. `POST /evaluations`
+now returns per-case scores alongside the bar; the legacy `adversarial.py` suite is kept as a
+sub-result so nothing that depended on it is lost.
+
+**What the corpus found — four real defects, all fixed:**
+- **Duplicate header names crashed ingest.** Polars raises `DuplicateError` on a frame with the
+  same column name twice. Ingest now disambiguates the later occurrences (`supplier_name`,
+  `supplier_name_1`) and warns, instead of dying (FR-044).
+- **A UTF-8 BOM was glued to the first column name**, so `﻿invoice_number` broke every
+  later reference to that column. CSV is now read as `utf-8-sig` and header names are cleaned.
+- **Full-width and zero-width injection text evaded the guard.** `Ｉｇｎｏｒｅ　ａｌｌ…` and
+  `Igno<ZWSP>re all…` both passed the literal regex. The scanner now normalises with NFKC and
+  strips Unicode format characters before matching, while still displaying the original text
+  (FR-045).
+- **Latin-1 bytes quarantined the whole file.** Undecodable bytes are no longer a reason to drop
+  a row; `errors="replace"` keeps the cell and the row.
+
+**Two labels were wrong, not the engine:** `sparse_column_95` is 95% null, which is sparse rather
+than all-null, and `duplicate_rows` has 3 distinct invoice numbers over 5 rows, so it correctly
+has no primary key. The ground truth was corrected. A third case exposed a genuine gap: a
+near-unique column of code-shaped values was only called an identifier when its *name* contained
+"id/number/code", so a `sku` column in the inventory domain was missed. The profiler now also
+recognises that shape, which is dataset-agnostic by construction (FR-050).
+
+**Scores with the model off:** 18 cases, 0 crashes, quarantine recall 1.0, quarantine precision 1.0,
+injection flag rate 1.0, rule recall 1.0 — above every D5 bar. Backend suite: 231 tests pass.
+
+**Status:** active. M3 remainder: B7 (cross-field fill), B9 (prompt versioning), E3 (API fuzzing).
+
 ## 2026-10-01 — Level 3 plan defaults accepted (SB)
 
 **Decision:** SB accepted the PROPOSED defaults in `docs/LEVEL3_PLAN.md` §3:
