@@ -541,6 +541,8 @@ export interface ExportVariables {
   format: ExportFormat;
   /** Used for the download file name; the plan id is the fallback. */
   datasetName?: string;
+  /** csv only: download one table (e.g. "main" or an expanded child table). */
+  table?: string;
 }
 
 export type UseExportResult = UseMutationResult<
@@ -551,13 +553,14 @@ export type UseExportResult = UseMutationResult<
 
 /** `{dataset name}-v{n}.xlsx` (pipeline exports are JSON). */
 export function exportFileName(
-  { planId, format, datasetName }: ExportVariables,
+  { planId, format, datasetName, table }: ExportVariables,
   response?: Pick<ExportResponse, "versionNo">
 ): string {
   const rawBase = (datasetName ?? planId).trim() || planId;
   const base = rawBase.replace(/[^A-Za-z0-9 _.-]/g, "_");
   const versionNo = toNumber(response?.versionNo);
   const version = versionNo === null ? "" : `-v${versionNo}`;
+  if (table) return `${base}-${table}${version}.csv`;
   return `${base}${version}.${EXPORT_EXTENSIONS[format] ?? "csv"}`;
 }
 
@@ -570,7 +573,9 @@ export function useExport(): UseExportResult {
   return useMutation<ExportResponse, ApiError, ExportVariables>({
     mutationFn: async (variables) => {
       const response = await api
-        .post(`plans/${variables.planId}/exports`, { json: { format: variables.format } })
+        .post(`plans/${variables.planId}/exports`, {
+          json: { format: variables.format, ...(variables.table ? { table: variables.table } : {}) },
+        })
         .json<ExportResponse>();
 
       await downloadFromUrl(response.downloadUrl, exportFileName(variables, response));

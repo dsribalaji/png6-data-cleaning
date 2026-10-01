@@ -161,6 +161,9 @@ def apply_inverse(df: pl.DataFrame, inverse: InverseOp) -> pl.DataFrame:
 
     if op == "restore_cells":
         column = p["column"]
+        # An op that renamed the column (expand_nested: col -> col_count) undoes it here.
+        if p.get("rename_from") in df.columns and column not in df.columns:
+            df = df.rename({p["rename_from"]: column})
         rows = p["rows"]
         values = p["values"]
         dtype_str = p.get("dtype")

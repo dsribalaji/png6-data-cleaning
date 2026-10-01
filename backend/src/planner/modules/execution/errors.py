@@ -8,6 +8,7 @@ from planner.core.errors import AppError
 class ExecutionErrors:
     PLAN_NOT_FOUND = AppError("PLAN_NOT_FOUND", "Plan not found.", 404)
     VERSION_NOT_FOUND = AppError("VERSION_NOT_FOUND", "Version not found.", 404)
+    TABLE_NOT_FOUND = AppError("TABLE_NOT_FOUND", "This plan has no table with that name.", 404)
     REASON_REQUIRED = AppError(
         "REASON_REQUIRED", "Enter a reason of at least 10 characters.", 400
     )

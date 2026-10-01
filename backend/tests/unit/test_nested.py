@@ -42,3 +42,18 @@ def test_parse_nested__never_evaluates_code() -> None:
 def test_summarise__counts_every_cell() -> None:
     counts = summarise(['[{"a": 1}]', "[{'a': 1}]", '[{"a": 1},{"a', "", "[x"])
     assert counts == {"ok": 1, "repaired": 1, "partial": 1, "invalid": 1, "empty": 1, "items": 3}
+
+
+def test_expand_nested__parent_gets_count_column_and_undo_restores_json() -> None:
+    import polars as pl
+
+    from planner.engine.ops.base import OPS, apply_inverse
+
+    df = pl.DataFrame({"id": ["a", "b"], "items": ['[{"x": "$1.50"}]', "[{'x': '2'}, {'x': '3'}]"]})
+    op = OPS["expand_nested"]
+    params = {"column": "items", "key_column": "id", "child_table": "Items"}
+    after = op.apply(df, params)
+    assert after.columns == ["id", "items_count"] and after["items_count"].to_list() == [1, 2]
+    child = op.extract_tables(df, params)["Items"]
+    assert child["x"].to_list() == [1.5, 2.0, 3.0]  # money text -> numbers, repaired cell kept
+    assert apply_inverse(after, op.inverse(df, after, params)).equals(df)

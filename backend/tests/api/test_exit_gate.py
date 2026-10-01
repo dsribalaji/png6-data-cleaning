@@ -110,6 +110,13 @@ def test_exit_gate__reference_invoice_file__upload_to_validated_export_and_rollb
 
     z = zipfile.ZipFile(io.BytesIO(download("csv")))
     assert sorted(z.namelist()) == ["LineItems.csv", "main.csv"]
+    # One table on its own (the Run page's per-table download); the parent keeps a count.
+    url = _ok(client.post(f"{api}/plans/{plan['id']}/exports", json={"format": "csv", "table": "LineItems"}))["downloadUrl"]
+    line_items_csv = client.get(url).text.splitlines()
+    assert len(line_items_csv) == 313 + 1 and line_items_csv[0].startswith("invoice_number,")
+    assert "line_items_count" in header and "line_items" not in header
+    r = client.post(f"{api}/plans/{plan['id']}/exports", json={"format": "csv", "table": "nope"})
+    assert r.status_code == 404
     pipeline = json.loads(download("pipeline"))
     assert [s["operation"] for s in pipeline["steps"]] == ops
 

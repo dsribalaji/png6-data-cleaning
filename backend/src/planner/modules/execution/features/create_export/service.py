@@ -108,6 +108,12 @@ async def create_export(
             data = buf.getvalue()
             content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             object_key = f"{base}/tables.xlsx"
+        elif req.table:  # csv of one table
+            if req.table not in tables:
+                raise ExecutionErrors.TABLE_NOT_FOUND
+            data = tables[req.table].write_csv().encode("utf-8")
+            content_type = "text/csv"
+            object_key = f"{base}/{req.table}.csv"
         else:  # csv: one file per table, zipped
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:

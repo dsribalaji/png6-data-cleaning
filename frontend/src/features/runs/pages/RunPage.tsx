@@ -57,6 +57,9 @@ const RECONCILIATION_TITLE = "Reconciliation";
 const RECONCILIATION_SUBTITLE =
   "Source totals compared with the cleaned output of this version.";
 const NO_RECONCILIATIONS = "No reconciliation checks have been run for this version.";
+const OUTPUT_TABLES_TITLE = "Output tables (nested records become their own table)";
+const DOWNLOAD_TABLE_CSV = "Download CSV";
+const outputTableRows = (rows: unknown) => `${String(rows ?? "?")} rows`;
 const EXPORT_TITLE = "Export";
 const EXPORT_SUBTITLE = "Exports are produced from the validated output.";
 const XLSX_LABEL = "XLSX";
@@ -374,18 +377,28 @@ export function RunPage() {
     void queryClient.invalidateQueries({ queryKey: [PLAN_KEY, planId] });
   }, [lastEvent, planId, queryClient]);
 
-  const handleExport = async (format: ExportFormat) => {
+  const handleExport = async (format: ExportFormat, table?: string) => {
     try {
       await exportMutation.mutateAsync({
         planId,
         format,
         datasetName: datasetQuery.data?.name,
+        table,
       });
       toast.success(EXPORT_DOWNLOADING);
     } catch (error: unknown) {
       toast.error(mapExportError(error));
     }
   };
+
+  // Every output table and its rows, from the reconciliation row counts: "main"
+  // plus one child table per expanded nested column.
+  const outputTables = (validation?.reconciliation ?? []).flatMap((r) => {
+    if (r.checkName === "row_count") return [{ name: "main", rows: r.outputValue }];
+    if (r.checkName.startsWith("row_count:"))
+      return [{ name: r.checkName.slice("row_count:".length), rows: r.outputValue }];
+    return [];
+  });
 
   if (planQuery.isError) {
     return (
@@ -579,6 +592,34 @@ export function RunPage() {
                   {entry.label}
                 </Button>
               ))}
+              {outputTables.length > 0 && (
+                <div className="mt-2 w-full">
+                  <p className="mb-2 text-sm font-medium text-[#1f2937] dark:text-[#f3f4f6]">
+                    {OUTPUT_TABLES_TITLE}
+                  </p>
+                  <ul className="divide-y divide-[#e9ecef] rounded-md border border-[#e9ecef] text-sm dark:divide-[#343a40] dark:border-[#343a40]">
+                    {outputTables.map((t) => (
+                      <li key={t.name} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <span>
+                          <span className="font-mono">{t.name}</span>
+                          <span className="ml-2 text-[#6c757d] dark:text-[#a0aec0]">
+                            {outputTableRows(t.rows)}
+                          </span>
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void handleExport("csv", t.name)}
+                          loading={exportMutation.isPending && exportMutation.variables?.table === t.name}
+                          disabled={exportMutation.isPending}
+                        >
+                          {DOWNLOAD_TABLE_CSV}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             /* One or more tests failed: the actions are hidden, not disabled

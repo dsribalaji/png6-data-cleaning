@@ -145,10 +145,19 @@ class ExpandNestedOperation(Operation):
         # Shared parser: strict JSON, Python-style literals, salvaged cut-off lists.
         return parse_nested(cell).items
 
+    @staticmethod
+    def count_column(df_columns: list[str], col: str) -> str:
+        """The records move to the child table; the parent keeps how many there were,
+        under a name that says so ("items" -> "items_count")."""
+        name = f"{col}_count"
+        return name if name not in df_columns else col
+
     def apply(self, df: pl.DataFrame, params: dict[str, Any]) -> pl.DataFrame:
         col = params["column"]
         counts = [len(self._parse_cell(c)) for c in df[col].to_list()]
-        return df.with_columns(pl.Series(col, counts, dtype=pl.Int64))
+        out = df.with_columns(pl.Series(col, counts, dtype=pl.Int64))
+        target = self.count_column(df.columns, col)
+        return out.rename({col: target}) if target != col else out
 
     def extract_tables(
         self, df: pl.DataFrame, params: dict[str, Any]
@@ -207,6 +216,7 @@ class ExpandNestedOperation(Operation):
                 "rows": rows,
                 "values": values,
                 "dtype": "String",
+                "rename_from": self.count_column(before.columns, col),
             },
         )
 

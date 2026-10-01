@@ -47,6 +47,9 @@ class RollbackResponse(CamelModel):
 
 class ExportRequest(CamelModel):
     format: str = "xlsx"
+    # csv only: one table's CSV file (e.g. "main" or a child table such as an
+    # expanded nested column) instead of a zip of every table.
+    table: str | None = None
 
 
 class ExportResponse(CamelModel):
