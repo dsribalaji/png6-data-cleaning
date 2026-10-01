@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import ClassVar
 from uuid import UUID
 
 from sqlalchemy import (
@@ -67,7 +68,7 @@ class Dataset(Base):
         ),
         {"schema": SCHEMA},
     )
-    __mapper_args__ = {"version_id_col": version}
+    __mapper_args__: ClassVar[dict] = {"version_id_col": version}
 
     quarantine_records: Mapped[list[QuarantineRecord]] = relationship(
         "QuarantineRecord",

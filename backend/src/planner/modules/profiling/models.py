@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
 import uuid
+from datetime import datetime
+from typing import Any, ClassVar
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     Float,
     Integer,
-    JSON,
     Numeric,
     String,
     Text,
@@ -28,7 +28,7 @@ class ColumnProfileRow(Base):
     """Stores per-column profile metrics for a dataset."""
 
     __tablename__ = "column_profiles"
-    __table_args__ = {"schema": "profiling"}
+    __table_args__: ClassVar[dict] = {"schema": "profiling"}
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[UUID] = mapped_column(Uuid, index=True)
@@ -79,7 +79,7 @@ class ProfileRun(Base):
     """Stores dataset-level profile summary metrics."""
 
     __tablename__ = "profile_runs"
-    __table_args__ = {"schema": "profiling"}
+    __table_args__: ClassVar[dict] = {"schema": "profiling"}
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[UUID] = mapped_column(Uuid, unique=True, index=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import and_, select
@@ -86,7 +86,7 @@ async def export_audit_events(
         ])
 
     csv_content = output.getvalue()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     filename = f"audit-events-{now.strftime('%Y%m%d-%H%M%S')}.csv"
 
     return ExportAuditEventsOut(

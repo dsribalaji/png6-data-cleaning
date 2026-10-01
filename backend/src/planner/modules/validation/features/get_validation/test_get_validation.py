@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import types
 import uuid
+from datetime import UTC
 from unittest.mock import AsyncMock
 
 import pytest
@@ -133,7 +134,7 @@ async def test_get_validation_and_latest_passed(test_session: AsyncSession, monk
     assert passed is True
 
     # Now add an after run that failed for tc2
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     tr2_a_fail = TestRunRow(
         id=uuid.uuid4(),
@@ -142,7 +143,7 @@ async def test_get_validation_and_latest_passed(test_session: AsyncSession, monk
         phase="after",
         result="failed",
         detail="Unexpected failure",
-        run_at=datetime.now(timezone.utc) + timedelta(seconds=5),
+        run_at=datetime.now(UTC) + timedelta(seconds=5),
     )
     test_session.add(tr2_a_fail)
     await test_session.commit()

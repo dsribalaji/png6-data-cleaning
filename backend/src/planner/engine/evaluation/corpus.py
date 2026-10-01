@@ -234,7 +234,7 @@ def _sparse_column_95() -> BenchmarkCase:
     """A column that is >=95% null must be reported, not silently dropped."""
     header = ["invoice_number", "supplier_name", "legacy_code"]
     rows = [
-        ["INV-%03d" % i, "Supplier %d" % i, ("L-%d" % i if i <= 1 else None)]
+        [f"INV-{i:03d}", f"Supplier {i}", (f"L-{i}" if i <= 1 else None)]
         for i in range(1, 21)
     ]
     return BenchmarkCase(
@@ -289,7 +289,7 @@ def _entity_variants() -> BenchmarkCase:
     names = _variants("Hart Business Solutions", ", LLC", 3) + _variants(
         "Microsoft Corporation", " (India) Private Limited", 3
     ) + ["Acme Foods", "Acme Foods Limited"]
-    rows = [["INV-%03d" % i, n] for i, n in enumerate(names, start=1)]
+    rows = [[f"INV-{i:03d}", n] for i, n in enumerate(names, start=1)]
     return BenchmarkCase(
         case_id="entity_variants",
         description="Entity spellings that should collapse into groups.",

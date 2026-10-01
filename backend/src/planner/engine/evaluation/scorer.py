@@ -203,11 +203,13 @@ def compare(case: BenchmarkCase, out: CaseResult) -> list[str]:
         missing = sorted(set(expected_rules) - set(out.rule_types))
         failures.append(f"rules missing {missing} (got {out.rule_types})")
 
-    if exp.get("distinct_headers") and out.column_count is not None:
-        if out.duplicate_headers_renamed == 0 and out.column_count < len(
-            {c for c in exp.get("headers", []) if c}
-        ):
-            failures.append("duplicate header names were not disambiguated")
+    if (
+        exp.get("distinct_headers")
+        and out.column_count is not None
+        and out.duplicate_headers_renamed == 0
+        and out.column_count < len({c for c in exp.get("headers", []) if c})
+    ):
+        failures.append("duplicate header names were not disambiguated")
 
     return failures
 
@@ -334,8 +336,8 @@ def run_benchmark(*, llm_on: bool = False, verbose: bool = False) -> dict[str, A
 __all__ = [
     "BAR",
     "CaseResult",
-    "check_bar",
     "bar_report",
+    "check_bar",
     "compare",
     "run_benchmark",
     "run_case",

@@ -6,6 +6,7 @@ Pure data logic - no FastAPI/DB imports.
 from __future__ import annotations
 
 from typing import Any, ClassVar
+
 import polars as pl
 
 from planner.engine.ops.base import (
@@ -99,7 +100,7 @@ class FillMissingOperation(Operation):
             raise ValueError("Parameter 'value' is required")
         val = params["value"]
         if not isinstance(val, (str, int, float, bool)):
-            raise ValueError("Parameter 'value' must be str, int, float, or bool")
+            raise TypeError("Parameter 'value' must be str, int, float, or bool")
 
     def apply(self, df: pl.DataFrame, params: dict[str, Any]) -> pl.DataFrame:
         column = params["column"]

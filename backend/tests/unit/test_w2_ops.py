@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from hypothesis import given, settings
-from hypothesis import strategies as st
+
 import polars as pl
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from planner.engine.loss import (
     DEFAULT_LOSS_THRESHOLD,
@@ -26,13 +27,10 @@ from planner.engine.ops import (
 )
 from planner.engine.profile.profiler import ColumnProfile, TableProfile
 from planner.engine.tests_gen import (
-    SUPPORTED_CHECKS,
-    TestCase,
     export_pytest,
     generate_checks,
     run_checks,
 )
-
 
 # =====================================================================
 # (a) Hand-built apply/inverse round-trip for EACH of the 8 ops

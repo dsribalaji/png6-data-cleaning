@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +30,7 @@ async def accept_invite(
 ) -> AcceptInviteResult:
     """Validate invite token, activate user with password, and issue login credentials."""
     token_h = hash_token(token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     stmt = select(Invite).where(Invite.token_hash == token_h)
     result = await session.execute(stmt)
@@ -44,7 +44,7 @@ async def accept_invite(
 
     expires_at = invite.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
     if expires_at < now:
         raise AppError("INVALID_CREDENTIALS", message="Invite has expired.")
 

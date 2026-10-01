@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
-
 from fastapi import Query
 from pydantic import BaseModel, ConfigDict
-
-T = TypeVar("T")
 
 
 def _to_camel(name: str) -> str:
@@ -15,7 +11,7 @@ def _to_camel(name: str) -> str:
     return parts[0] + "".join(p[:1].upper() + p[1:] for p in parts[1:])
 
 
-class Page(BaseModel, Generic[T]):
+class Page[T](BaseModel):
     """Standard pagination envelope serialized as camelCase for the API."""
 
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
@@ -36,6 +32,6 @@ def page_params(
     return page, page_size
 
 
-def build_page(items: list[T], total: int, page: int, page_size: int) -> Page[T]:
+def build_page[T](items: list[T], total: int, page: int, page_size: int) -> Page[T]:
     """Helper to build a Page[T] envelope."""
     return Page(items=items, total=total, page=page, page_size=page_size)

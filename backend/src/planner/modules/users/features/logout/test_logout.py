@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -33,7 +32,7 @@ async def session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.mark.asyncio
 async def test_logout__with_valid_refresh_token__revokes_token(session: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(email="logout_user@example.com", status="active")
     session.add(user)
     await session.flush()

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+
 import polars as pl
 
 from planner.engine.ops.base import str_to_dtype
@@ -120,7 +120,7 @@ def run_checks(
                                 else f"Pattern '{pattern}' did not match all non-null values",
                             )
                         )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 -- per-check resilience; failure recorded in TestResult
                         results.append(
                             TestResult(
                                 name=case.name,
@@ -178,33 +178,7 @@ def run_checks(
                         )
                     )
 
-            elif check == "mapping_applied":
-                col = defn.get("column", "")
-                mapping = defn.get("mapping", {})
-                if col not in target_df.columns:
-                    results.append(
-                        TestResult(
-                            name=case.name,
-                            passed=False,
-                            detail=f"Column '{col}' does not exist",
-                        )
-                    )
-                else:
-                    vals = target_df[col].drop_nulls().to_list()
-                    # mapping keys are the pre-mapping variants: none may remain.
-                    unmapped = [x for x in vals if x in mapping]
-                    passed = len(unmapped) == 0
-                    results.append(
-                        TestResult(
-                            name=case.name,
-                            passed=passed,
-                            detail=f"All {len(vals)} values mapped"
-                            if passed
-                            else f"{len(unmapped)} unmapped variants remain: {unmapped[:5]}",
-                        )
-                    )
-
-            elif check == "mapping_applied":
+            elif check == "mapping_applied" or check == "mapping_applied":
                 col = defn.get("column", "")
                 mapping = defn.get("mapping", {})
                 if col not in target_df.columns:
@@ -246,7 +220,7 @@ def run_checks(
                     try:
                         exp_pl_dt = str_to_dtype(expected_dtype)
                         passed = target_df[col].dtype == exp_pl_dt
-                    except Exception:
+                    except Exception:  # noqa: BLE001 -- unknown dtype string falls back to name comparison
                         passed = actual_dt.lower() == expected_dtype.lower()
                     results.append(
                         TestResult(
@@ -295,7 +269,7 @@ def run_checks(
                                 detail=f"Sum of '{col}' is {actual_sum} (expected {exp_sum})",
                             )
                         )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 -- per-check resilience; failure recorded in TestResult
                         results.append(
                             TestResult(
                                 name=case.name,
@@ -330,7 +304,7 @@ def run_checks(
                                 detail=f"Max diff between '{left}' and '{right}' is {max_diff}",
                             )
                         )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 -- per-check resilience; failure recorded in TestResult
                         results.append(
                             TestResult(
                                 name=case.name,
@@ -348,7 +322,7 @@ def run_checks(
                     )
                 )
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- per-case resilience; the harness must not crash mid-suite
             results.append(
                 TestResult(
                     name=case.name,
@@ -402,7 +376,7 @@ def export_pytest(cases: list[TestCase], path: str | Path) -> None:
 
         elif check == "unique":
             cols = defn.get("columns", [])
-            lines.append(f"    cols = {repr(cols)}")
+            lines.append(f"    cols = {cols!r}")
             lines.append("    for c in cols:")
             lines.append('        assert c in df.columns, f"Column {c} missing"')
             lines.append(
@@ -432,9 +406,9 @@ def export_pytest(cases: list[TestCase], path: str | Path) -> None:
 
         elif check == "values_in":
             col = defn.get("column", "")
-            allowed = sorted(list(defn.get("allowed", [])))
+            allowed = sorted(defn.get("allowed", []))
             lines.append(f'    assert "{col}" in df.columns, "Column {col} missing"')
-            lines.append(f"    allowed = set({repr(allowed)})")
+            lines.append(f"    allowed = set({allowed!r})")
             lines.append(f'    actual = set(df["{col}"].drop_nulls().to_list())')
             lines.append(
                 '    assert actual.issubset(allowed), f"Disallowed values: {actual - allowed}"'
@@ -444,7 +418,7 @@ def export_pytest(cases: list[TestCase], path: str | Path) -> None:
             col = defn.get("column", "")
             mapping = defn.get("mapping", {})
             lines.append(f'    assert "{col}" in df.columns, "Column {col} missing"')
-            lines.append(f"    mapping = {repr(mapping)}")
+            lines.append(f"    mapping = {mapping!r}")
             lines.append(f'    vals = df["{col}"].drop_nulls().to_list()')
             lines.append("    unmapped = [x for x in vals if x in mapping]")
             lines.append('    assert not unmapped, f"Unmapped variants remain: {unmapped[:5]}"')

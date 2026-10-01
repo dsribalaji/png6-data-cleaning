@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import io
 import zipfile
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import UploadFile

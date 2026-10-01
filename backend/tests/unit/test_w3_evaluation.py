@@ -8,8 +8,9 @@ from unittest.mock import MagicMock
 
 import openpyxl
 import pytest
-from sqlalchemy import ForeignKeyConstraint, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from planner.core.db import Base
 from planner.core.errors import AppError
@@ -31,9 +32,6 @@ from planner.modules.evaluation.features.list_evaluations.service import list_ev
 from planner.modules.evaluation.models import BenchmarkSet, EvaluationRun
 from planner.modules.evaluation.public import ensure_default_benchmark_set, get_run
 from planner.modules.evaluation.tasks import _run_evaluation_async
-
-
-from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture

@@ -8,11 +8,11 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
     Text,
     UniqueConstraint,
     Uuid,

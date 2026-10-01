@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
 import uuid
+from datetime import datetime
+from typing import Any, ClassVar
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
     Numeric,
     String,
     Text,
@@ -98,7 +98,7 @@ class LossEstimateRow(Base):
     """Estimated loss breakdown for a plan step."""
 
     __tablename__ = "loss_estimates"
-    __table_args__ = {"schema": "planning"}
+    __table_args__: ClassVar[dict] = {"schema": "planning"}
 
     step_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("planning.plan_steps.id"), primary_key=True

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -30,7 +30,7 @@ async def deactivate_user_service(
     if user is None:
         raise AppError("NOT_FOUND")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     previous_status = user.status
     user.status = "deactivated"
 

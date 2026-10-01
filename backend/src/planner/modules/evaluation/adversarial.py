@@ -14,7 +14,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 INJECTION_RE = re.compile(
     r"ignore (all )?previous instructions|^\s*system\s*:|<\|system\|>"
     r"|\bdrop table\b|disregard (all )?instructions",
-    re.I,
+    re.IGNORECASE,
 )
 
 
@@ -98,7 +98,7 @@ def quarantine_check(payload: bytes) -> QuarantineVerdict:
                 reason="unparseable workbook",
                 detail={"error": str(exc)},
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- adversarial checks must never crash; unexpected errors are a verdict
             return QuarantineVerdict(
                 verdict="crashed",
                 reason=f"Unexpected error: {exc}",
@@ -209,23 +209,22 @@ def quarantine_check(payload: bytes) -> QuarantineVerdict:
                             "error": f"formula string: {val}",
                         },
                     )
-                if col_idx in numeric_col_indices:
-                    if not isinstance(val, (int, float)):
-                        try:
-                            float(str(val))
-                        except (ValueError, TypeError):
-                            return QuarantineVerdict(
-                                verdict="quarantined",
-                                reason="malformed rows",
-                                detail={
-                                    "row": row_idx,
-                                    "column": col_idx,
-                                    "error": (
-                                        f"non-numeric value '{val}' in "
-                                        f"numeric column '{header[col_idx]}'"
-                                    ),
-                                },
-                            )
+                if col_idx in numeric_col_indices and not isinstance(val, (int, float)):
+                    try:
+                        float(str(val))
+                    except (ValueError, TypeError):
+                        return QuarantineVerdict(
+                            verdict="quarantined",
+                            reason="malformed rows",
+                            detail={
+                                "row": row_idx,
+                                "column": col_idx,
+                                "error": (
+                                    f"non-numeric value '{val}' in "
+                                    f"numeric column '{header[col_idx]}'"
+                                ),
+                            },
+                        )
 
         # 3. Sparse column check (>=90% null)
         if data_rows:
@@ -257,7 +256,7 @@ def quarantine_check(payload: bytes) -> QuarantineVerdict:
             reason="clean",
             detail={"data_rows": len(data_rows), "header_columns": header_len},
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- adversarial checks must never crash; unexpected errors are a verdict
         return QuarantineVerdict(
             verdict="crashed",
             reason=f"Unexpected error: {exc}",

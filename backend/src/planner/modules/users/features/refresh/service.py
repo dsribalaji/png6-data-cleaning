@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ from planner.modules.users.models import RefreshToken, User
 async def refresh_tokens(session: AsyncSession, refresh_token_raw: str) -> RefreshResult:
     """Validate refresh token, rotate it within family, and detect reuse."""
     token_h = hash_token(refresh_token_raw)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     stmt = select(RefreshToken).where(RefreshToken.token_hash == token_h)
     result = await session.execute(stmt)
@@ -48,7 +48,7 @@ async def refresh_tokens(session: AsyncSession, refresh_token_raw: str) -> Refre
     # Check expiration
     expires_at = token_row.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
     if expires_at < now:
         token_row.revoked_at = now
         await session.commit()

@@ -6,9 +6,9 @@ import secrets
 import time
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, JSON, Text, Uuid, func
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from planner.core.db import Base
@@ -31,7 +31,7 @@ class BenchmarkSet(Base):
     """evaluation.benchmark_sets - collection of fixture datasets for evaluation."""
 
     __tablename__ = "benchmark_sets"
-    __table_args__ = {"schema": "evaluation"}
+    __table_args__: ClassVar[dict] = {"schema": "evaluation"}
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid7)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)

@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import logging
 import os
 import tempfile
+from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
 import polars as pl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from planner.core.db import SessionLocal
@@ -92,7 +92,7 @@ def merge_steps(
                 raise ValueError("not in the operation catalogue")
             OPS[c.operation].validate(c.parameters, schema)
             estimate_step_loss(df, c.operation, c.parameters)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- LLM candidates are untrusted; invalid ones are recorded and skipped
             rejected.append(f"{c.operation}({key(c)[1] or '?'}): {str(exc)[:80]}")
             logger.info("llm step rejected: %s %s: %s", c.operation, c.parameters, exc)
             continue
@@ -224,7 +224,7 @@ async def _try_llm_steps(
                     )
                 )
         return candidates, None
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- LLM is non-blocking; the failure is returned to the caller
         return [], exc
 
 
@@ -455,7 +455,7 @@ def build_steps_from_rules(
         try:
             OPS[cand.operation].validate(cand.parameters, schema)
             valid_candidates.append(cand)
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             logger.warning(
                 "Skipping invalid candidate step %s with params %s: %s",
                 cand.operation,
@@ -503,7 +503,7 @@ async def _generate_plan_impl(
             raise ValueError(f"Plan {plan_id} not found")
 
         # Load profile and rules
-        profile_run = await get_profile_run(session, dataset_id)
+        _profile_run = await get_profile_run(session, dataset_id)
         column_rows = await get_column_profile_rows(session, dataset_id)
         rule_rows = await list_rule_rows(session, dataset_id)
 
@@ -563,7 +563,12 @@ async def _generate_plan_impl(
     for s in final_steps:
         try:
             loss = estimate_step_loss(df, s.operation, s.parameters)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 -- loss estimation is best-effort; default to zero loss
+            logger.warning(
+                "Loss estimation failed for op %s; defaulting to zero: %s",
+                s.operation,
+                exc,
+            )
             loss = LossEstimate(
                 op=s.operation,
                 rows_affected=0,
@@ -645,8 +650,8 @@ async def _generate_plan_impl(
                 plan_id=plan_id,
             ),
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- realtime notification is best-effort
+        logger.warning("Failed to publish plan-generated status: %s", exc)
 
     return {"plan_id": plan_id_str, "steps": len(final_steps)}
 

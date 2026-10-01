@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,6 +12,8 @@ from planner.core.audit import record_audit
 from planner.modules.planning.errors import PlanningErrors
 from planner.modules.planning.models import LossEstimateRow, Plan, PlanStep
 from planner.modules.planning.schemas import LossEstimateOut, PlanOut, PlanStepOut
+
+logger = logging.getLogger(__name__)
 
 
 async def get_plan(session: AsyncSession, plan_id: UUID) -> PlanOut:
@@ -38,8 +41,8 @@ async def get_plan(session: AsyncSession, plan_id: UUID) -> PlanOut:
             object_id=str(plan_id),
             details={"step_count": len(step_rows)},
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- audit is defensive; never fail the read
+        logger.debug("Failed to record plan.viewed audit event: %s", exc)
 
     steps_out: list[PlanStepOut] = []
     for step in step_rows:

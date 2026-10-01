@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,7 @@ from planner.modules.users.models import RefreshToken, User
 async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
     """Authenticate user with email/password and issue access + refresh tokens."""
     email_clean = data.email.strip().lower()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     stmt = select(User).where(User.email == email_clean)
     result = await session.execute(stmt)
@@ -47,7 +47,7 @@ async def login_user(session: AsyncSession, data: LoginRequest) -> LoginResult:
     if user.locked_until is not None:
         locked_until = user.locked_until
         if locked_until.tzinfo is None:
-            locked_until = locked_until.replace(tzinfo=timezone.utc)
+            locked_until = locked_until.replace(tzinfo=UTC)
         if locked_until > now:
             await record_audit(
             session=session,

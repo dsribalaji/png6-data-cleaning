@@ -52,13 +52,13 @@ __all__ = [
     "get_run",
 ]
 
-from planner.modules.evaluation.features.create_evaluation.router import (  # noqa: E402
+from planner.modules.evaluation.features.create_evaluation.router import (
     router as create_evaluation_router,
 )
-from planner.modules.evaluation.features.get_evaluation.router import (  # noqa: E402
+from planner.modules.evaluation.features.get_evaluation.router import (
     router as get_evaluation_router,
 )
-from planner.modules.evaluation.features.list_evaluations.router import (  # noqa: E402
+from planner.modules.evaluation.features.list_evaluations.router import (
     router as list_evaluations_router,
 )
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -57,7 +57,7 @@ async def test_dataset_events__two_jobs__replays_in_order_with_correct_fields(
 ) -> None:
     """Replay yields both jobs oldest-first with camelCase fields and the SSE id."""
     plan_id = uuid7()
-    base = datetime(2026, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
+    base = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
 
     async with session_factory() as session:
         first = await create_job(session=session, dataset_id=dataset.id, type="ingest")
@@ -109,7 +109,7 @@ async def test_dataset_events__last_event_id__skips_older_events(
     dataset: Dataset,
 ) -> None:
     """A Last-Event-ID equal to the first job replays only the later job."""
-    base = datetime(2026, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
+    base = datetime(2026, 9, 30, 12, 0, 0, tzinfo=UTC)
 
     async with session_factory() as session:
         first = await create_job(session=session, dataset_id=dataset.id, type="ingest")

@@ -62,16 +62,20 @@ class RedisEventPublisher:
                     if isinstance(data, (str, bytes)):
                         try:
                             yield json.loads(data)
-                        except Exception:
-                            pass
+                        except json.JSONDecodeError as exc:
+                            logger.warning(
+                                "Dropping malformed JSON payload on channel %s: %s",
+                                channel,
+                                exc,
+                            )
                     elif isinstance(data, dict):
                         yield data
         finally:
             try:
                 await pubsub.unsubscribe(channel)
                 await pubsub.aclose()
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 -- pubsub teardown must never raise
+                logger.warning("Failed to clean up redis pubsub subscription: %s", exc)
 
 
 class InMemoryEventPublisher:
@@ -122,7 +126,7 @@ async def get_publisher() -> EventPublisher:
         await client.aclose()
         _publisher = RedisEventPublisher(settings.redis_url)
         return _publisher
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- any redis failure falls back to in-memory
         logger.warning(
             "Redis connection failed (%s); falling back to InMemoryEventPublisher",
             exc,
@@ -168,7 +172,7 @@ async def sse_event_generator(
                 msg = await asyncio.wait_for(anext(subscription), timeout=15.0)
                 event_id = str(msg.get("job_id", msg.get("jobId", "")))
                 yield format_sse(event_id, msg)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield ": heartbeat\n\n"
             except StopAsyncIteration:
                 break

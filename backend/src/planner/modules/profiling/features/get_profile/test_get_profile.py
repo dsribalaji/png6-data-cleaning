@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -63,7 +63,7 @@ async def test_invite_user__new_email__stores_hashed_token_and_returns_raw_token
 
 @pytest.mark.asyncio
 async def test_invite_user__valid_email__expires_in_24_hours(session: AsyncSession) -> None:
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
 
     result = await invite_user_service(
         session,
@@ -71,14 +71,14 @@ async def test_invite_user__valid_email__expires_in_24_hours(session: AsyncSessi
         InviteUserRequest(email="timing@example.com", role="viewer"),
     )
 
-    after = datetime.now(timezone.utc)
+    after = datetime.now(UTC)
     assert before + timedelta(hours=24) <= result.expires_at <= after + timedelta(hours=24)
 
     invites = (await session.execute(select(Invite))).scalars().all()
     row_expiry = invites[0].expires_at
     assert row_expiry is not None
     if row_expiry.tzinfo is None:
-        row_expiry = row_expiry.replace(tzinfo=timezone.utc)
+        row_expiry = row_expiry.replace(tzinfo=UTC)
     # The persisted expiry matches the value returned to the caller.
     assert abs((row_expiry - result.expires_at).total_seconds()) < 1
 

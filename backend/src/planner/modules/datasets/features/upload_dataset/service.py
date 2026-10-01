@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
-from uuid import UUID
 
 from fastapi import UploadFile
 from sqlalchemy import select
@@ -57,7 +56,7 @@ def _precheck_quarantine(file_name: str, data: bytes) -> tuple[list[dict[str, st
                     )
         except zipfile.BadZipFile as exc:
             return [{"row_ref": "file", "reason": f"Unreadable zip archive: {exc}"}], True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- structural precheck is best-effort; never block upload
             logger.warning("Error inspecting xlsx zip structure: %s", exc)
 
         return records, False
@@ -87,7 +86,7 @@ def _precheck_quarantine(file_name: str, data: bytes) -> tuple[list[dict[str, st
                             "reason": "Non-UTF-8 characters detected in CSV row",
                         }
                     )
-                except Exception:
+                except UnicodeDecodeError:
                     records.append(
                         {
                             "row_ref": f"row {idx}",
@@ -115,7 +114,7 @@ async def upload_dataset_service(
     lower_name = file_name.lower()
 
     # 1. Enforce allowed extension (.xlsx or .csv)
-    if not (lower_name.endswith(".xlsx") or lower_name.endswith(".csv")):
+    if not lower_name.endswith((".xlsx", ".csv")):
         raise DatasetsErrors.UNSUPPORTED_FILE_TYPE
 
     # 2. Enforce dataset name uniqueness
@@ -199,7 +198,7 @@ async def upload_dataset_service(
             kwargs={"dataset_id": str(dataset_id), "job_id": str(job.id)},
             wait=False,  # ingest + profile can take a while; the row updates live
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- enqueue is best-effort; dataset already committed
         logger.warning("Could not enqueue Celery ingest task: %s", exc)
 
     # 8. Record audit event

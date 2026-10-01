@@ -48,7 +48,7 @@ class LlmCache:
                     if isinstance(res, bytes):
                         return res.decode("utf-8")
                     return str(res)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- cache never raises; falls back to memory
                 logger.warning("llm_cache_redis_get_failed", key=key, error=str(exc))
 
         # Check in-memory fallback
@@ -61,7 +61,7 @@ class LlmCache:
             self._memory.pop(key, None)
         return None
 
-    async def set(self, key: str, value: str, ttl_s: float | int = DEFAULT_TTL_S) -> None:
+    async def set(self, key: str, value: str, ttl_s: float = DEFAULT_TTL_S) -> None:
         """Store completion in cache with TTL. Never raises on Redis errors."""
         if self._redis is not None:
             try:
@@ -69,7 +69,7 @@ class LlmCache:
                 res = self._redis.set(key, value, px=px)
                 if inspect.isawaitable(res):
                     await res
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- cache never raises; falls back to memory
                 logger.warning("llm_cache_redis_set_failed", key=key, error=str(exc))
 
         # Always maintain in-memory fallback

@@ -7,8 +7,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import planner.llm.gateway as gateway
 from planner.core.audit import record_audit
+from planner.llm import gateway
 from planner.llm.gateway import ResolvedModelConfig
 from planner.modules.model_config.crypto import decrypt_credential
 from planner.modules.model_config.errors import (

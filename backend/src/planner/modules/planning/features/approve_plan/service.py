@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
 import uuid
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,6 +16,8 @@ from planner.core.outbox import add_event
 from planner.modules.planning.errors import PlanningErrors
 from planner.modules.planning.models import Plan, PlanStep
 from planner.modules.planning.schemas import ApproveResponse
+
+logger = logging.getLogger(__name__)
 
 
 async def approve_plan(
@@ -42,7 +45,7 @@ async def approve_plan(
     job_id = uuid.uuid4()
     plan.status = "approved"
     plan.approved_by = actor_id
-    plan.approved_at = datetime.now(timezone.utc)
+    plan.approved_at = datetime.now(UTC)
 
     # Outbox event
     await add_event(session, EventType.PLAN_APPROVED, PlanApprovedPayload(plan_id=plan.id))
@@ -60,8 +63,8 @@ async def approve_plan(
             args=[str(plan.id), str(job_id)],
             queue="validate",
         )
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 -- enqueue is best-effort; plan already approved
+        logger.warning("Failed to enqueue test-generation task for plan %s: %s", plan.id, exc)
 
     # Audit defensively
     try:
@@ -73,8 +76,8 @@ async def approve_plan(
             user_id=actor_id,
             details={"job_id": str(job_id), "steps_count": len(steps)},
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- audit is defensive; never fail approval
+        logger.warning("Failed to record plan.approved audit event: %s", exc)
 
     await session.commit()
     await session.refresh(plan)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -40,7 +40,7 @@ async def _seed(
     session: AsyncSession, count: int, other_count: int = 0
 ) -> tuple[Dataset, Dataset]:
     """Seed a dataset with `count` quarantine rows and a second dataset with `other_count`."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     dataset = Dataset(
         id=uuid7(),

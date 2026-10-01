@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import io
 import json
-import zipfile
-from datetime import datetime, timedelta, timezone
-from uuid import UUID
 import uuid
+import zipfile
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 import openpyxl
 import polars as pl
@@ -18,8 +18,6 @@ from planner.core.errors import AppError
 from planner.modules.execution.errors import ExecutionErrors
 from planner.modules.execution.models import ExportRow
 from planner.modules.execution.schemas import ExportRequest, ExportResponse
-
-
 
 # C5 / OWASP CSV injection: text a spreadsheet would run as a formula gets a leading
 # apostrophe. A leading "-" is left alone when the cell is just a number ("-12.5").
@@ -125,7 +123,7 @@ async def create_export(
 
     await storage.put_object(object_key, data, content_type)
     download_url = await storage.presigned_get_url(object_key, expires_seconds=900)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + timedelta(seconds=900)
 
     export_row = ExportRow(

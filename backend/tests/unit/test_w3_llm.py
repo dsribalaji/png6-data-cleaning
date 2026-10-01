@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import pathlib
-import time
 from typing import Any
 
 import pytest
@@ -24,7 +23,8 @@ from planner.llm.gateway import (
     LlmGateway,
     ResolvedModelConfig,
     _litellm_model_id,
-    _load_prompt,
+)
+from planner.llm.gateway import (
     test_connection as gateway_test_connection,
 )
 from planner.llm.redaction import (

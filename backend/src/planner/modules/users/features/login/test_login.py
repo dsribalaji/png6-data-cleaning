@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -111,7 +111,7 @@ async def test_login__five_failed_attempts__locks_account_for_15_minutes(
 
 @pytest.mark.asyncio
 async def test_login__locked_account__raises_account_locked(session: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(
         email="already_locked@example.com",
         password_hash=hash_password("CorrectPassword123!"),

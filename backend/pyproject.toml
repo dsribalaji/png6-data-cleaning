@@ -65,3 +65,12 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's dependency-injection system is declarative: Depends(), Query(), File()
+# and DI factories like require_roles() in argument defaults are the framework's
+# documented pattern, not the mutable-default bug B008 guards against.
+"src/planner/**/router.py" = ["B008"]
+"src/planner/main.py" = ["B008"]
+"src/planner/core/security.py" = ["B008"]
+"src/planner/modules/users/public.py" = ["B008"]

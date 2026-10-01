@@ -10,20 +10,20 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from planner.core.config import settings
-from planner.core.db import Base
+import planner.modules.audit.models
+import planner.modules.datasets.models
+import planner.modules.evaluation.models
+import planner.modules.execution.models
+import planner.modules.model_config.models
+import planner.modules.planning.models
+import planner.modules.profiling.models
 
 # Import every module's models so autogenerate sees the full metadata.
 # (New modules must add their import here.)
-import planner.modules.users.models  # noqa: F401
-import planner.modules.datasets.models  # noqa: F401
-import planner.modules.profiling.models  # noqa: F401
-import planner.modules.planning.models  # noqa: F401
-import planner.modules.execution.models  # noqa: F401
+import planner.modules.users.models
 import planner.modules.validation.models  # noqa: F401
-import planner.modules.model_config.models  # noqa: F401
-import planner.modules.audit.models  # noqa: F401
-import planner.modules.evaluation.models  # noqa: F401
+from planner.core.config import settings
+from planner.core.db import Base
 
 config = context.config
 

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.db import get_session
 from planner.core.pagination import Page
+
 # Auth: require_roles is a security dependency owned by worker W1 (comment noting dependency)
 from planner.core.security import RequestPrincipal, require_roles
 from planner.modules.evaluation.features.list_evaluations.schemas import (

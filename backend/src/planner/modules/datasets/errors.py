@@ -15,6 +15,6 @@ class DatasetsErrors:
     NOT_FOUND = app_error("NOT_FOUND")
 
     @staticmethod
-    def file_too_large(limit: int | float) -> AppError:
+    def file_too_large(limit: float) -> AppError:
         """Return a formatted FILE_TOO_LARGE error for a specific size limit."""
         return app_error("FILE_TOO_LARGE", limit=limit)

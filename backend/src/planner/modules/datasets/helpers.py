@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -64,7 +64,7 @@ async def update_job(
     if job is None:
         raise AppError("NOT_FOUND", f"Job {job_id} not found.")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if status is not None:
         job.status = status
         if status == "running" and job.started_at is None:
@@ -97,7 +97,7 @@ async def update_job(
     )
     try:
         await publish_job_status(job.dataset_id, payload)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- status publish is best-effort; never fail the job update
         logger.warning(
             "Failed to publish job status for job %s on dataset %s: %s",
             job.id,

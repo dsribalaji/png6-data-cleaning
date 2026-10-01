@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -109,7 +108,7 @@ async def test_decide_step_edit(test_session: AsyncSession):
     res = await decide_step(test_session, plan.id, step.id, req)
     assert res.decision == "edited"
     assert res.decision_reason == "Updated to canonical legal entity"
-    assert res.parameters["mapping"]["ACME INC"] == "Corp".join(["Acme ", ""])
+    assert res.parameters["mapping"]["ACME INC"] == "Acme Corp"
 
 
 @pytest.mark.asyncio

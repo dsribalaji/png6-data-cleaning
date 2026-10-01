@@ -13,9 +13,9 @@ from planner.engine.guards.scanner import (
 __all__ = [
     "INJECTION_PATTERNS",
     "InjectionFlag",
+    "check_size_limits",
+    "check_sparsity",
+    "mask_sample",
     "scan_frame",
     "scan_prompt_injection",
-    "check_sparsity",
-    "check_size_limits",
-    "mask_sample",
 ]

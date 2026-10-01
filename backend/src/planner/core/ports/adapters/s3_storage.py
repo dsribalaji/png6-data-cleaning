@@ -104,7 +104,7 @@ class S3StorageAdapter:
             try:
                 self._client.head_object(Bucket=self.bucket, Key=clean_key)
                 return True
-            except Exception:
+            except ClientError:
                 return False
 
         return await asyncio.to_thread(_sync_exists)

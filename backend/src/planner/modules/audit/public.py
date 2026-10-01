@@ -72,4 +72,4 @@ bind_audit_sink(_DbAuditSink())
 
 routers = [list_audit_events_router, export_audit_events_router]
 
-__all__ = ["append_audit_event", "AuditEvent", "routers"]
+__all__ = ["AuditEvent", "append_audit_event", "routers"]

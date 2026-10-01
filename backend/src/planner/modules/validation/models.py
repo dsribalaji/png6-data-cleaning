@@ -8,12 +8,12 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
     Text,
     Uuid,
     func,

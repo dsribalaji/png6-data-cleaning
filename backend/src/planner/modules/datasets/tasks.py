@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -111,7 +111,7 @@ async def _async_ingest_dataset(task_self: Any, dataset_id: str, job_id: str) ->
         for row_ref, reason in getattr(ingest_result, "quarantine", []):
             session.add(QuarantineRecord(dataset_id=d_uuid, row_ref=row_ref, reason=reason))
         # Stays "profiling": the profile + rules tasks chained below flip it to "profiled".
-        dataset.ingested_at = datetime.now(timezone.utc)
+        dataset.ingested_at = datetime.now(UTC)
 
         await update_job(
             session=session,
@@ -160,7 +160,7 @@ def ingest_dataset(self: Any, dataset_id: str, job_id: str) -> None:
         if "ENGINE_NOT_STARTED" in str(err):
             raise
         _handle_retry_or_fail(self, err, job_id)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- Celery task boundary: convert any failure to retry/fail handling
         _handle_retry_or_fail(self, exc, job_id)
 
 
@@ -196,7 +196,7 @@ def _handle_retry_or_fail(task: Any, exc: Exception, job_id: str) -> None:
 
     try:
         asyncio.run(_mark_failed())
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001 -- failure bookkeeping must not mask the original error
         logger.error("Failed to mark job %s as failed: %s", job_id, err)
     raise exc
 
@@ -263,10 +263,10 @@ async def _async_poll_n8n_folder() -> int:
                         "planner.modules.datasets.tasks.ingest_dataset",
                         kwargs={"dataset_id": str(dataset_id), "job_id": str(job.id)},
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 -- enqueue is best-effort; file stays for next poll
                     logger.warning("Failed to enqueue ingest task for %s: %s", file_name, exc)
-        except Exception as exc:
-            logger.exception("Error processing n8n folder file %s: %s", file_name, exc)
+        except Exception:
+            logger.exception("Error processing n8n folder file %s", file_name)
 
     return polled_count
 

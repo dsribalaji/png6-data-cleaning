@@ -16,12 +16,12 @@ import io
 import json
 import re
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
 import pytest
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -43,7 +43,6 @@ from planner.modules.audit.features.list_audit_events.router import (
     router as list_router,
 )
 from planner.modules.audit.features.list_audit_events.schemas import (
-    AuditEventOut,
     ListAuditEventsInput,
 )
 from planner.modules.audit.features.list_audit_events.service import (
@@ -130,11 +129,11 @@ async def _seed_5_events(db_session: AsyncSession) -> tuple[UUID, UUID, list[Aud
     user_a = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
     user_b = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
-    d1 = datetime(2026, 9, 1, 10, 0, 0, tzinfo=timezone.utc)
-    d2 = datetime(2026, 9, 2, 10, 0, 0, tzinfo=timezone.utc)
-    d3 = datetime(2026, 9, 3, 10, 0, 0, tzinfo=timezone.utc)
-    d4 = datetime(2026, 9, 4, 10, 0, 0, tzinfo=timezone.utc)
-    d5 = datetime(2026, 9, 5, 10, 0, 0, tzinfo=timezone.utc)
+    d1 = datetime(2026, 9, 1, 10, 0, 0, tzinfo=UTC)
+    d2 = datetime(2026, 9, 2, 10, 0, 0, tzinfo=UTC)
+    d3 = datetime(2026, 9, 3, 10, 0, 0, tzinfo=UTC)
+    d4 = datetime(2026, 9, 4, 10, 0, 0, tzinfo=UTC)
+    d5 = datetime(2026, 9, 5, 10, 0, 0, tzinfo=UTC)
 
     events = [
         AuditEvent(
@@ -203,7 +202,7 @@ async def test_list_audit_events__filters__each_filter_narrows_correctly(
     # 1. Filter: from_time (>= 2026-09-03) -> matches d3, d4, d5 (3 events)
     res_from = await list_audit_events(
         db_session,
-        ListAuditEventsInput(from_=datetime(2026, 9, 3, 0, 0, 0, tzinfo=timezone.utc)),
+        ListAuditEventsInput(from_=datetime(2026, 9, 3, 0, 0, 0, tzinfo=UTC)),
     )
     assert res_from.total == 3
     assert {e.event_type for e in res_from.items} == {
@@ -215,7 +214,7 @@ async def test_list_audit_events__filters__each_filter_narrows_correctly(
     # 2. Filter: to_time (<= 2026-09-02 23:59:59) -> matches d1, d2 (2 events)
     res_to = await list_audit_events(
         db_session,
-        ListAuditEventsInput(to=datetime(2026, 9, 2, 23, 59, 59, tzinfo=timezone.utc)),
+        ListAuditEventsInput(to=datetime(2026, 9, 2, 23, 59, 59, tzinfo=UTC)),
     )
     assert res_to.total == 2
     assert {e.event_type for e in res_to.items} == {"auth.login", "dataset.uploaded"}
@@ -224,8 +223,8 @@ async def test_list_audit_events__filters__each_filter_narrows_correctly(
     res_range = await list_audit_events(
         db_session,
         ListAuditEventsInput(
-            from_=datetime(2026, 9, 2, 0, 0, 0, tzinfo=timezone.utc),
-            to=datetime(2026, 9, 4, 23, 59, 59, tzinfo=timezone.utc),
+            from_=datetime(2026, 9, 2, 0, 0, 0, tzinfo=UTC),
+            to=datetime(2026, 9, 4, 23, 59, 59, tzinfo=UTC),
         ),
     )
     assert res_range.total == 3
@@ -415,13 +414,13 @@ def test_audit_module__append_only_guard__no_delete_or_update_statements() -> No
         lines = content.splitlines()
         for idx, line in enumerate(lines, 1):
             stripped = line.strip()
-            if stripped.startswith("#") or stripped.startswith('"""') or stripped.startswith("'''"):
+            if stripped.startswith(("#", '"""', "'''")):
                 continue
             for pattern in forbidden_patterns:
                 if pattern.search(line):
                     violations.append(f"{py_file.name}:{idx} matches forbidden pattern '{pattern.pattern}': {line}")
 
-    assert not violations, f"Append-only rule violated! Found forbidden operations:\n" + "\n".join(violations)
+    assert not violations, "Append-only rule violated! Found forbidden operations:\n" + "\n".join(violations)
 
 
 def test_audit_api__http_endpoints__roles_and_responses(db_session: AsyncSession) -> None:

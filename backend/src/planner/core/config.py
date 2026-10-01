@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Literal
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from planner.core.secrets import load_openbao_secrets
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -86,8 +89,11 @@ class Settings(BaseSettings):
                     parsed = json.loads(v_str)
                     if isinstance(parsed, list):
                         return [str(x).strip() for x in parsed]
-                except Exception:
-                    pass
+                except json.JSONDecodeError as exc:
+                    logger.debug(
+                        "cors_origins is not valid JSON; falling back to comma split: %s",
+                        exc,
+                    )
             return [x.strip() for x in v_str.split(",") if x.strip()]
         return v
 

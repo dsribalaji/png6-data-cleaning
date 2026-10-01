@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
-from planner.engine.evaluation import BAR, all_cases, bar_report, run_benchmark, score_suite
+from planner.engine.evaluation import BAR, all_cases, bar_report, run_benchmark
 from planner.engine.evaluation.corpus import BenchmarkCase
 from planner.engine.evaluation.scorer import CaseResult, check_bar, compare, run_case
 from planner.engine.guards.scanner import normalise_for_scan
-from planner.engine.ingest.reader import _clean_header_name, read_csv, read_workbook
+from planner.engine.ingest.reader import _clean_header_name, read_csv
 
 
 def test_corpus__has_at_least_twelve_labelled_cases() -> None:

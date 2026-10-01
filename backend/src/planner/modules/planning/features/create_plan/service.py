@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+import logging
 import uuid
 from uuid import UUID
 
@@ -17,6 +17,8 @@ from planner.modules.planning.schemas import (
     PlanOut,
     PlanStepOut,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def create_plan(
@@ -51,9 +53,9 @@ async def create_plan(
             args=[str(dataset_id), str(job_id), str(plan.id)],
             queue="plan",
         )
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 -- enqueue is best-effort; plan already committed
         # In testing or standalone worker configurations, dispatch may fail
-        pass
+        logger.warning("Failed to enqueue plan-generation task for plan %s: %s", plan.id, exc)
 
     # Audit defensively
     try:
@@ -65,8 +67,8 @@ async def create_plan(
             user_id=actor_id,
             details={"dataset_id": str(dataset_id), "loss_threshold": plan.loss_threshold},
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- audit is defensive; never fail creation
+        logger.warning("Failed to record plan.created audit event: %s", exc)
 
     await session.commit()
     await session.refresh(plan)

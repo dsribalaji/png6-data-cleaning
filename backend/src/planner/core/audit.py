@@ -60,7 +60,6 @@ async def record_audit(
     **kwargs: Any,
 ) -> None:
     """Record an audit event, delegating to the bound AuditSink if present."""
-    global _sink
     pos = list(args)
     if pos and hasattr(pos[0], "execute"):
         session = session or pos.pop(0)

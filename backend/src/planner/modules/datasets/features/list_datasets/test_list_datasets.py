@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -60,7 +61,7 @@ async def test_list_datasets__multiple_datasets__returns_ordered_paginated(
     async_session: AsyncSession,
     principal: RequestPrincipal,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for i in range(5):
         ds = Dataset(
             id=uuid7(),

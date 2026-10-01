@@ -73,7 +73,6 @@ async def get_dataset(session, dataset_id):
 
 async def update_dataset_status(session, dataset_id, status: str):
     """Set the dataset status. Integration 2026-09-30."""
-    from uuid import UUID
 
     dataset = await get_dataset(session, dataset_id)
     if dataset is None:

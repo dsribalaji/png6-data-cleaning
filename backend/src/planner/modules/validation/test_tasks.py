@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import sys
 import types
 import uuid
@@ -12,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import polars as pl
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from planner.core.db import Base
 from planner.core.outbox import OutboxEvent

@@ -15,12 +15,12 @@ os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
 
 # Register every model on Base.metadata (same list as migrations/env.py) so slice
 # tests' create_all() builds complete schemas: cross-module FKs and audit rows.
-import planner.modules.users.models  # noqa: E402,F401
-import planner.modules.datasets.models  # noqa: E402,F401
-import planner.modules.profiling.models  # noqa: E402,F401
-import planner.modules.planning.models  # noqa: E402,F401
-import planner.modules.execution.models  # noqa: E402,F401
-import planner.modules.validation.models  # noqa: E402,F401
-import planner.modules.model_config.models  # noqa: E402,F401
-import planner.modules.audit.models  # noqa: E402,F401
-import planner.modules.evaluation.models  # noqa: E402,F401
+import planner.modules.audit.models
+import planner.modules.datasets.models
+import planner.modules.evaluation.models
+import planner.modules.execution.models
+import planner.modules.model_config.models
+import planner.modules.planning.models
+import planner.modules.profiling.models
+import planner.modules.users.models
+import planner.modules.validation.models  # noqa: F401

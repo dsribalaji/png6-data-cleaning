@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import logging
 import os
 import tempfile
+from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
@@ -26,9 +27,12 @@ from planner.core.ports.llm import LlmGatewayPort
 from planner.engine.guards.scanner import mask_sample, scan_frame, scan_prompt_injection
 from planner.engine.infer.rules import InferredRule, infer_rules
 from planner.engine.ingest.parquet import read_parquet
-from planner.engine.profile.profiler import ColumnProfile, TableProfile, profile_table
+from planner.engine.profile.profiler import TableProfile, profile_table
 from planner.modules.profiling.models import ColumnProfileRow, InferredRuleRow, ProfileRun
 from planner.worker import celery_app, send_task_eager_aware
+
+logger = logging.getLogger(__name__)
+
 
 KNOWN_RULE_TYPES = {
     "entity_group",
@@ -149,7 +153,7 @@ async def _try_llm_rules(
                 )
             )
         return rules, None
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- LLM is non-blocking; the failure is returned to the caller
         # LLM failure must never break the deterministic pipeline
         return [], exc
 
@@ -268,8 +272,8 @@ async def _profile_dataset_impl(dataset_id_str: str, job_id_str: str) -> dict[st
                 message="Profile complete, inferring rules",
             ),
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- status publish is best-effort
+        logger.warning("Failed to publish profile-running status: %s", exc)
 
     # The dataset stays "profiling" until the chained infer task has saved its rules.
 
@@ -389,8 +393,8 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
                 message=f"Rules inferred ({len(merged)} rules)",
             ),
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- realtime notification is best-effort
+        logger.warning("Failed to publish rules-inferred status: %s", exc)
 
     # Update dataset status defensively
     try:
@@ -400,8 +404,8 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
             # Profile and rules are both saved: the dataset is ready for a plan.
             await update_dataset_status(session, dataset_id, "profiled")
             await session.commit()
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- status update is defensive
+        logger.warning("Failed to update dataset status to profiled: %s", exc)
 
     # Mark the profile job as succeeded (integration 2026-09-30)
     try:
@@ -410,8 +414,8 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
         async with SessionLocal() as session:
             await update_job(session, job_id, status="succeeded", progress_pct=100.0)
             await session.commit()
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 -- job bookkeeping is defensive
+        logger.warning("Failed to mark profile job succeeded: %s", exc)
 
     return {"rules": len(merged)}
 

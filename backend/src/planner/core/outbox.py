@@ -7,13 +7,13 @@ The relay (beat task) publishes unpublished rows to the message broker.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from celery import shared_task
 from pydantic import BaseModel
-from sqlalchemy import DateTime, Index, JSON, Text, Uuid, func, select, text
+from sqlalchemy import JSON, DateTime, Index, Text, Uuid, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -93,7 +93,7 @@ async def _async_relay(limit: int = 100, task_instance: Any = None) -> int:
     if celery is None:
         try:
             from planner.worker import celery_app as celery
-        except Exception:
+        except ImportError:
             celery = None
 
     published_count = 0
@@ -111,7 +111,7 @@ async def _async_relay(limit: int = 100, task_instance: Any = None) -> int:
             result = await session.execute(stmt)
             rows = result.scalars().all()
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             for row in rows:
                 task_name = get_outbox_handler(row.event_type)
                 if task_name and celery is not None:

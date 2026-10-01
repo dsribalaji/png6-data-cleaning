@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from planner.core.pagination import Page, build_page
 from planner.core.security import RequestPrincipal
 from planner.modules.datasets.features.get_quarantine.schemas import QuarantineRecordRead
-from planner.modules.datasets.models import QuarantineRecord
 from planner.modules.datasets.helpers import get_dataset_or_404
+from planner.modules.datasets.models import QuarantineRecord
 
 
 async def get_quarantine_service(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -15,6 +15,7 @@ from planner.core.outbox import add_event
 from planner.engine.evaluation import bar_report, run_benchmark
 from planner.modules.evaluation import adversarial
 from planner.modules.evaluation.models import EvaluationRun
+
 # NOTE: W1 must ensure this module is imported at worker startup so tasks are registered.
 from planner.worker import celery_app
 
@@ -62,7 +63,7 @@ async def _run_evaluation_async(
                 "early_exit": True,
             }
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         run.status = "running"
         run.started_at = now
         run.error_message = None
@@ -98,7 +99,7 @@ async def _run_evaluation_async(
                 ],
                 "legacy": adversarial.run_adversarial_suite(),
             }
-            finished_now = datetime.now(timezone.utc)
+            finished_now = datetime.now(UTC)
             run.scores = scores
             run.status = "succeeded"
             run.finished_at = finished_now
@@ -121,7 +122,7 @@ async def _run_evaluation_async(
             await session.commit()
             return scores
         except Exception as exc:
-            finished_now = datetime.now(timezone.utc)
+            finished_now = datetime.now(UTC)
             run.status = "failed"
             run.error_message = str(exc)[:500]
             run.finished_at = finished_now

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ async def logout_user(
         token_row = result.scalar_one_or_none()
 
         if token_row is not None and token_row.revoked_at is None:
-            token_row.revoked_at = datetime.now(timezone.utc)
+            token_row.revoked_at = datetime.now(UTC)
             await session.commit()
 
     return LogoutResponse(message="Logged out successfully")

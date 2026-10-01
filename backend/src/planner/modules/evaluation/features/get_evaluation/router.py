@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.db import get_session
+
 # Auth: require_roles is a security dependency owned by worker W1 (comment noting dependency)
 from planner.core.security import RequestPrincipal, require_roles
 from planner.modules.evaluation.features.get_evaluation.schemas import (

@@ -5,14 +5,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import io
-from pathlib import Path
+import logging
 import tempfile
-from typing import Any
 import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 from uuid import UUID
-from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+logger = logging.getLogger(__name__)
+
+from sqlalchemy import select
 
 from planner.core.audit import record_audit
 from planner.core.db import SessionLocal
@@ -61,10 +64,10 @@ async def _async_execute_plan(plan_id: str, job_id: str) -> dict[str, Any]:
             steps = await get_decided_steps(session, plan_uuid)
 
             # Idempotency check: if versions already match decided steps
-            if max_version_no > 0:
-                # v0 is base; versions-1 is count of executed steps
-                if len(existing_versions) - 1 == len(steps):
-                    return {"status": "already_done", "plan_id": plan_id}
+            # Idempotency check: if versions already match decided steps
+            # (v0 is base; versions-1 is count of executed steps)
+            if max_version_no > 0 and len(existing_versions) - 1 == len(steps):
+                return {"status": "already_done", "plan_id": plan_id}
 
             storage = get_storage()
 
@@ -208,10 +211,8 @@ async def _async_execute_plan(plan_id: str, job_id: str) -> dict[str, Any]:
                         plan_id=plan_uuid,
                     ),
                 )
-            except NotImplementedError:
-                pass
-            except Exception:
-                pass
+            except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- status publish is best-effort
+                logger.warning("Failed to publish plan-executed status: %s", exc)
 
             send_task_eager_aware(
                 "planner.run_validation",
@@ -233,8 +234,8 @@ async def _async_execute_plan(plan_id: str, job_id: str) -> dict[str, Any]:
                     ),
                 )
                 await session.commit()
-            except Exception:
-                pass
+            except (NotImplementedError, Exception) as bookkeeping_exc:  # noqa: BLE001 -- failure bookkeeping is best-effort
+                logger.warning("Failed to record job-failed event: %s", bookkeeping_exc)
             raise
 
 
@@ -326,7 +327,7 @@ async def _async_rollback_plan(
         r_res = await session.execute(r_stmt)
         rollback_row = r_res.scalars().first()
         if rollback_row:
-            rollback_row.completed_at = datetime.now(timezone.utc)
+            rollback_row.completed_at = datetime.now(UTC)
 
         await add_event(
             session,
@@ -346,14 +347,7 @@ async def _async_rollback_plan(
                      "sha256": restored_sha, "byteIdentical": True},
         )
 
-        try:
-            from planner.core.realtime import publish_job_status
-            from planner.core.events import JobStatusPayload
-            # Defensive realtime publish
-        except NotImplementedError:
-            pass
-        except Exception:
-            pass
+        # Defensive realtime publish: not wired yet (no-op placeholder).
 
         return {
             "plan_id": plan_id,

@@ -60,8 +60,8 @@ async def create_evaluation(
         # key at commit time, which surfaces as a 500. It is a client input
         # error, so it answers 404 MODEL_CONFIG_NOT_FOUND like the other
         # not-found cases in this module.
-        from planner.modules.model_config.public import get_model_config
         from planner.modules.model_config.errors import MODEL_CONFIG_NOT_FOUND
+        from planner.modules.model_config.public import get_model_config
 
         if await get_model_config(session, input.model_config_id) is None:
             raise MODEL_CONFIG_NOT_FOUND

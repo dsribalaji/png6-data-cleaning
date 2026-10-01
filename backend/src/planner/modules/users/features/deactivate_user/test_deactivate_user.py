@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -43,7 +43,7 @@ async def _make_user(session: AsyncSession, email: str, role: str) -> User:
 
 
 def _refresh_token(user_id: UUID, *, revoked: bool = False) -> RefreshToken:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return RefreshToken(
         id=uuid7(),
         user_id=user_id,
@@ -80,7 +80,6 @@ async def test_deactivate_user__live_refresh_tokens__all_revoked(session: AsyncS
     actor = await _make_user(session, "admin@example.com", "administrator")
     target = await _make_user(session, "engineer@example.com", "data_engineer")
 
-    before = datetime.now(timezone.utc)
     session.add(_refresh_token(target.id))
     session.add(_refresh_token(target.id))
     session.add(_refresh_token(actor.id))

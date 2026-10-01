@@ -10,6 +10,7 @@ upload Parquet back to storage under ``ingested/...``.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -30,6 +31,18 @@ class DatasetIngestResult:
     # FR-044: rows that could not be parsed, as (row_ref, reason); saved to
     # quarantine/<dataset_id>.parquet so nothing is dropped silently.
     quarantine: list[tuple[str, str]] = field(default_factory=list)
+
+
+def _write_bytes(path: str, data: bytes) -> None:
+    """Write bytes to a local path (runs in a worker thread via asyncio.to_thread)."""
+    with open(path, "wb") as fh:
+        fh.write(data)
+
+
+def _read_bytes(path: str) -> bytes:
+    """Read bytes from a local path (runs in a worker thread via asyncio.to_thread)."""
+    with open(path, "rb") as fh:
+        return fh.read()
 
 
 async def ingest_dataset_file(raw_object_key: str) -> DatasetIngestResult:
@@ -62,8 +75,7 @@ async def ingest_dataset_file(raw_object_key: str) -> DatasetIngestResult:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_path = os.path.join(tmpdir, f"raw{suffix or '.bin'}")
-        with open(raw_path, "wb") as fh:
-            fh.write(raw_bytes)
+        await asyncio.to_thread(_write_bytes, raw_path, raw_bytes)
 
         if suffix == ".csv":
             result = read_csv(raw_path)
@@ -73,15 +85,13 @@ async def ingest_dataset_file(raw_object_key: str) -> DatasetIngestResult:
 
         parquet_path = os.path.join(tmpdir, "ingested.parquet")
         to_parquet(result.table, parquet_path)
-        with open(parquet_path, "rb") as fh:
-            parquet_bytes = fh.read()
+        parquet_bytes = await asyncio.to_thread(_read_bytes, parquet_path)
 
         quarantine_bytes = None
         if result.quarantine:
             q_path = os.path.join(tmpdir, "quarantine.parquet")
             to_parquet(result.quarantined, q_path)
-            with open(q_path, "rb") as fh:
-                quarantine_bytes = fh.read()
+            quarantine_bytes = await asyncio.to_thread(_read_bytes, q_path)
 
     await storage.put(ingested_key, parquet_bytes, content_type="application/octet-stream")
     if quarantine_bytes is not None:

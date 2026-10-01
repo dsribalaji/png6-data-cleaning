@@ -16,11 +16,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import select
 
-from planner.core.db import SessionLocal  # noqa: E402
-from planner.core.security import hash_password  # noqa: E402
-from planner.modules.users.models import User, UserRole  # noqa: E402
+from planner.core.db import SessionLocal
+from planner.core.security import hash_password
+from planner.modules.users.models import User, UserRole
 
 # (email, password, first name, role). Local demo only; change or remove for any shared deployment.
 DEMO_USERS = (

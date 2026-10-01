@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Index, JSON, Text, Uuid, func
+from sqlalchemy import JSON, DateTime, Index, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from planner.core.db import Base

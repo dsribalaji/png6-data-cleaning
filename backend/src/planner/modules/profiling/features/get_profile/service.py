@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,6 +12,8 @@ from planner.core.audit import record_audit
 from planner.modules.profiling.errors import ProfilingErrors
 from planner.modules.profiling.models import ColumnProfileRow, ProfileRun
 from planner.modules.profiling.schemas import ColumnProfileOut, ProfileResponse
+
+logger = logging.getLogger(__name__)
 
 
 async def get_profile(session: AsyncSession, dataset_id: UUID) -> ProfileResponse:
@@ -38,9 +41,9 @@ async def get_profile(session: AsyncSession, dataset_id: UUID) -> ProfileRespons
             object_id=str(dataset_id),
             details={"column_count": run.column_count},
         )
-    except (NotImplementedError, Exception):
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- audit is defensive; never fail the read
         # Audit sink not implemented yet
-        pass
+        logger.debug("Failed to record dataset.profile_viewed audit event: %s", exc)
 
     columns = [
         ColumnProfileOut(

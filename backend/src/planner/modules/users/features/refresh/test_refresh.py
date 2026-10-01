@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -35,7 +34,7 @@ async def session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.mark.asyncio
 async def test_refresh__valid_token__rotates_token_in_same_family(session: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(email="active@example.com", status="active")
     session.add(user)
     await session.flush()
@@ -77,7 +76,7 @@ async def test_refresh__valid_token__rotates_token_in_same_family(session: Async
 async def test_refresh__revoked_token_reuse__revokes_entire_family_and_raises_invalid_credentials(
     session: AsyncSession,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(email="reuse@example.com", status="active")
     session.add(user)
     await session.flush()
@@ -113,7 +112,7 @@ async def test_refresh__revoked_token_reuse__revokes_entire_family_and_raises_in
 
 @pytest.mark.asyncio
 async def test_refresh__expired_token__raises_invalid_credentials(session: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(email="expired@example.com", status="active")
     session.add(user)
     await session.flush()
@@ -137,7 +136,7 @@ async def test_refresh__expired_token__raises_invalid_credentials(session: Async
 
 @pytest.mark.asyncio
 async def test_refresh__deactivated_user__raises_account_inactive(session: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(email="deact@example.com", status="deactivated")
     session.add(user)
     await session.flush()

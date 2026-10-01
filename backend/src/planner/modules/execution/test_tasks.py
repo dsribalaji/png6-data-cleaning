@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import polars as pl
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from planner.core.db import Base
 from planner.core.outbox import OutboxEvent
@@ -45,7 +45,7 @@ async def setup_db(monkeypatch, tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_execute_plan_not_approved(setup_db, monkeypatch):
-    session, _ = setup_db
+    _session, _ = setup_db
     plan_id = uuid.uuid4()
     job_id = uuid.uuid4()
 

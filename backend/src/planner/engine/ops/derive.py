@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import re
 from typing import Any, ClassVar
-from dateutil import parser as date_parser
+
 import polars as pl
+from dateutil import parser as date_parser
 
 from planner.engine.nested import looks_nested, parse_nested
-
 from planner.engine.ops.base import (
     InverseOp,
     LossEstimate,
@@ -30,7 +30,7 @@ class DeriveColumnOperation(Operation):
 
         expr = params.get("expression")
         if not isinstance(expr, dict):
-            raise ValueError("Parameter 'expression' must be a dictionary")
+            raise TypeError("Parameter 'expression' must be a dictionary")
 
         op = expr.get("op")
         if op not in {"add", "subtract", "multiply", "divide"}:
@@ -45,7 +45,7 @@ class DeriveColumnOperation(Operation):
 
         for idx, arg in enumerate(args):
             if not isinstance(arg, dict):
-                raise ValueError(f"Argument at index {idx} must be a dictionary")
+                raise TypeError(f"Argument at index {idx} must be a dictionary")
             if "column" in arg:
                 col = arg["column"]
                 if col not in schema:
@@ -183,7 +183,7 @@ class ExpandNestedOperation(Operation):
         for parent_key, cell in zip(keys, cells):
             items = self._parse_cell(cell)
             for it in items:
-                for it_k in it.keys():
+                for it_k in it:
                     if it_k not in all_item_keys:
                         all_item_keys.append(it_k)
                 row_dict = {link_col: parent_key, **it}
@@ -294,7 +294,7 @@ class StandardiseFormatOperation(Operation):
                 else:
                     try:
                         new_vals.append(date_parser.parse(str(item)).date().isoformat())
-                    except Exception:
+                    except (ValueError, TypeError, OverflowError):
                         new_vals.append(None)
         elif fmt == "lower":
             new_vals = [str(x).lower() if x is not None else None for x in raw]

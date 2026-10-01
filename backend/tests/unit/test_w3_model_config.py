@@ -2,25 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
 import pytest
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import planner.llm.gateway as gateway
 from planner.core.config import settings
 from planner.core.db import Base
 from planner.core.errors import AppError
+from planner.llm import gateway
 from planner.modules.model_config.crypto import (
     credential_last4,
     decrypt_credential,
     encrypt_credential,
-)
-from planner.modules.model_config.errors import (
-    CONFIGURATION_ERROR,
-    MODEL_CONFIG_NOT_FOUND,
-    MODEL_CONNECTION_FAILED,
 )
 from planner.modules.model_config.features.get_model_config.service import get_model_config
 from planner.modules.model_config.features.list_providers.service import list_providers

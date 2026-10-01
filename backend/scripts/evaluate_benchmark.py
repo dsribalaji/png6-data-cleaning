@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Run the evaluation benchmark and report the D5 pass bar (Level 3, workstream C).
 
 Usage (from `backend/`):
@@ -24,7 +23,7 @@ from pathlib import Path
 # installing the package first.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from planner.engine.evaluation import bar_report, run_benchmark  # noqa: E402
+from planner.engine.evaluation import bar_report, run_benchmark
 
 
 def main() -> int:

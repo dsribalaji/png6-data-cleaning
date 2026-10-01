@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -8,6 +9,8 @@ import dateutil.parser
 import polars as pl
 
 from planner.engine.nested import parse_nested
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -69,7 +72,8 @@ def _check_date_strings(values: list[Any]) -> bool:
         try:
             dateutil.parser.parse(s)
             parsed_count += 1
-        except Exception:
+        except (ValueError, TypeError, OverflowError) as exc:
+            logger.debug("Skipping unparseable date string %r: %s", s, exc)
             continue
     return (parsed_count / len(values)) >= 0.8
 

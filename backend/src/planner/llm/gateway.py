@@ -102,7 +102,7 @@ def resolve_prompt_version(task: str, requested: str | None = None) -> str:
     wanted = requested or settings.llm_prompt_version
     if wanted in versions:
         return wanted
-    newest = sorted(versions, key=lambda v: int(re.sub(r"\D", "", v) or 0))[-1]
+    newest = max(versions, key=lambda v: int(re.sub(r"\D", "", v) or 0))
     logger.warning(
         "llm_prompt_version_missing", task=task, requested=wanted, using=newest
     )
@@ -150,7 +150,7 @@ class ProviderRateLimited(Exception):
         self.retry_after = retry_after
 
 
-def _parse_reply(raw: str | None, out: type[T]) -> T | None:
+def _parse_reply[T: BaseModel](raw: str | None, out: type[T]) -> T | None:
     """Last-chance parse of a reply instructor rejected: strip code fences and unwrap
     a one-item list ([{...}]) that some models return. None if it still does not fit."""
     if not raw:
@@ -175,7 +175,7 @@ def _completion(**kwargs: Any) -> Any:
     return litellm.completion(**kwargs)
 
 
-def _call_model(
+def _call_model[T: BaseModel](
     model_id: str,
     messages: list[dict[str, str]],
     out: type[T],
@@ -215,7 +215,7 @@ def _call_model(
         if last is not None:
             try:
                 raw = last.choices[0].message.content
-            except Exception:
+            except (AttributeError, IndexError, TypeError):
                 raw = None
         parsed = _parse_reply(raw, out)
         if parsed is not None:
@@ -333,9 +333,9 @@ class LlmGateway(LlmGatewayPort):
                     latency_ms=round(latency_ms, 2),
                 )
                 return res
-            except Exception:
+            except ValidationError as exc:
                 # If cached representation fails validation, bypass and re-generate
-                pass
+                logger.info("Discarding invalid llm cache entry: %s", exc)
 
         # 6. Build messages with delimited payload block
         user_content = f"<<<PAYLOAD_JSON\n```json\n{payload_json}\n```\n>>>END"

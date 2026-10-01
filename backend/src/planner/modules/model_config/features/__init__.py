@@ -25,8 +25,8 @@ router.include_router(list_providers_router)
 
 __all__ = [
     "get_model_config_router",
-    "update_model_config_router",
-    "test_model_connection_router",
     "list_providers_router",
     "router",
+    "test_model_connection_router",
+    "update_model_config_router",
 ]

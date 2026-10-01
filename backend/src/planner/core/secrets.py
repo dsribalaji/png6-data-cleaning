@@ -30,7 +30,7 @@ def load_openbao_secrets(environ: dict[str, str] = os.environ) -> list[str]:  # 
     )
     try:
         # Scheme checked above (http/https only), so no file:// or custom schemes.
-        with urllib.request.urlopen(request, timeout=5) as response:  # nosec B310  # noqa: S310
+        with urllib.request.urlopen(request, timeout=5) as response:  # nosec B310
             body = json.load(response)
     except Exception as exc:
         raise RuntimeError(f"OpenBao is configured (BAO_ADDR) but {path} could not be read: {exc}") from exc

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import io
 import sys
-import tempfile
 import types
 import uuid
 from pathlib import Path
@@ -147,6 +145,7 @@ async def test_create_export_csv_and_xlsx_success(
 
     # CSV zip carries every table; the workbook has one sheet per table
     import zipfile
+
     import openpyxl
 
     zf = zipfile.ZipFile(tmp_path / "exports" / str(plan_id) / "v1" / "tables.csv.zip")

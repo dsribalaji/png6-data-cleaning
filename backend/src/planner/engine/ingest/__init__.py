@@ -8,8 +8,8 @@ __all__ = [
     "DatasetIngestResult",
     "IngestResult",
     "ingest_dataset_file",
-    "read_workbook",
     "read_csv",
-    "to_parquet",
     "read_parquet",
+    "read_workbook",
+    "to_parquet",
 ]

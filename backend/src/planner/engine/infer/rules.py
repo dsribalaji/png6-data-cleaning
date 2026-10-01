@@ -6,11 +6,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import polars as pl
-
-from planner.engine.nested import parse_nested
 import rapidfuzz.fuzz
 import rapidfuzz.process
 
+from planner.engine.nested import parse_nested
 from planner.engine.profile.profiler import TableProfile
 
 
@@ -306,22 +305,25 @@ def infer_rules(df: pl.DataFrame, profile: TableProfile) -> list[InferredRule]:
                     null_slice = df.filter(null_mask)[other.name].drop_nulls()
                     not_null_slice = df.filter(~null_mask)[other.name].drop_nulls()
 
-                    if len(null_slice) == null_cnt and null_slice.n_unique() == 1:
-                        if not_null_slice.n_unique() > 1:
-                            const_val = null_slice[0]
-                            rules.append(
-                                InferredRule(
-                                    rule_type="cross_field_fill",
-                                    columns=[col.name, other.name],
-                                    expression={
-                                        "target": col.name,
-                                        "source": other.name,
-                                        "value": const_val,
-                                    },
-                                    confidence=0.85,
-                                    evidence={"null_rows_matched": null_cnt},
-                                    source="deterministic",
-                                )
+                    if (
+                        len(null_slice) == null_cnt
+                        and null_slice.n_unique() == 1
+                        and not_null_slice.n_unique() > 1
+                    ):
+                        const_val = null_slice[0]
+                        rules.append(
+                            InferredRule(
+                                rule_type="cross_field_fill",
+                                columns=[col.name, other.name],
+                                expression={
+                                    "target": col.name,
+                                    "source": other.name,
+                                    "value": const_val,
+                                },
+                                confidence=0.85,
+                                evidence={"null_rows_matched": null_cnt},
+                                source="deterministic",
                             )
+                        )
 
     return rules

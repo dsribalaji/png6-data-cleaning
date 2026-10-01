@@ -13,7 +13,6 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from planner.core.config import settings
 from planner.llm.cache import LlmCache
 from planner.llm.gateway import LlmGateway, ResolvedModelConfig
 

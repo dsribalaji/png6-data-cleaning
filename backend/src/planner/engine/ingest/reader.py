@@ -58,9 +58,7 @@ def _clean_header_name(raw: str) -> str:
 def _is_cell_empty(val: Any) -> bool:
     if val is None:
         return True
-    if isinstance(val, str) and val.strip() == "":
-        return True
-    return False
+    return isinstance(val, str) and val.strip() == ""
 
 
 def _is_row_empty(row: list[Any] | tuple[Any, ...]) -> bool:

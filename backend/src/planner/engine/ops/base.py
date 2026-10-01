@@ -9,8 +9,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, ClassVar
-from dateutil import parser as date_parser
+
 import polars as pl
+from dateutil import parser as date_parser
 
 
 @dataclass
@@ -250,17 +251,17 @@ class _OpsDict(dict):
     def _ensure_loaded(self) -> None:
         if not self._loaded:
             self._loaded = True
-            from planner.engine.ops.values import ReplaceValueOperation, FillMissingOperation
-            from planner.engine.ops.structure import (
-                DropColumnOperation,
-                CastTypeOperation,
-                DeduplicateOperation,
-            )
             from planner.engine.ops.derive import (
                 DeriveColumnOperation,
                 ExpandNestedOperation,
                 StandardiseFormatOperation,
             )
+            from planner.engine.ops.structure import (
+                CastTypeOperation,
+                DeduplicateOperation,
+                DropColumnOperation,
+            )
+            from planner.engine.ops.values import FillMissingOperation, ReplaceValueOperation
 
             self.update(
                 {

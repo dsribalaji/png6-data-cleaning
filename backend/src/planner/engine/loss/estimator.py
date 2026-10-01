@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 from typing import Any
+
 import polars as pl
 
 from planner.engine.ops.base import OPS, LossEstimate

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,6 +16,8 @@ from planner.modules.planning.errors import PlanningErrors
 from planner.modules.planning.models import LossEstimateRow, Plan, PlanStep
 from planner.modules.planning.schemas import DecideStepRequest, LossEstimateOut, PlanStepOut
 from planner.modules.profiling.models import ColumnProfileRow
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_DECISIONS = {"accepted", "edited", "rejected"}
 
@@ -61,7 +64,7 @@ async def decide_step(
 
         try:
             OPS[step.operation].validate(req.parameters, schema_hint)
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             raise AppError("INVALID_PARAMETERS", str(exc), 400) from exc
 
         step.parameters = req.parameters
@@ -81,13 +84,13 @@ async def decide_step(
                 loss_row.columns_affected = new_loss.columns_affected
                 loss_row.cells_affected = new_loss.cells_affected
                 loss_row.estimated_loss = new_loss.estimated_loss
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 -- loss re-estimation is best-effort; retain previous estimate
             # Snapshot frame not available or execution.public not landed; retain previous estimate
-            pass
+            logger.debug("Skipping loss re-estimation for step %s: %s", step.id, exc)
 
     step.decision = req.decision
     step.decision_reason = req.reason
-    step.decided_at = datetime.now(timezone.utc)
+    step.decided_at = datetime.now(UTC)
     step.decided_by = actor_id
 
     # Defensive audit
@@ -105,8 +108,8 @@ async def decide_step(
                 "reason": req.reason,
             },
         )
-    except (NotImplementedError, Exception):
-        pass
+    except (NotImplementedError, Exception) as exc:  # noqa: BLE001 -- audit is defensive; never fail the decision
+        logger.warning("Failed to record plan.step_decided audit event: %s", exc)
 
     await session.commit()
     await session.refresh(step)

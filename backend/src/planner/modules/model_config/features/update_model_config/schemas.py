@@ -24,4 +24,4 @@ class UpdateModelConfigInput(BaseModel):
     allow_data_sharing: bool = False
 
 
-__all__ = ["UpdateModelConfigInput", "ModelConfigOut"]
+__all__ = ["ModelConfigOut", "UpdateModelConfigInput"]

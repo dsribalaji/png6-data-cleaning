@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any, ClassVar
-from dateutil import parser as date_parser
+
 import polars as pl
+from dateutil import parser as date_parser
 
 from planner.engine.ops.base import (
     InverseOp,
@@ -118,7 +119,7 @@ class CastTypeOperation(Operation):
                 else:
                     try:
                         parsed_dates.append(date_parser.parse(str(item)).date())
-                    except Exception:
+                    except (ValueError, TypeError, OverflowError):
                         parsed_dates.append(None)
             casted = pl.Series(column, parsed_dates, dtype=pl.Date)
         else:
@@ -161,11 +162,7 @@ class CastTypeOperation(Operation):
         for b, a in zip(b_vals, a_vals):
             if b is None and a is None:
                 continue
-            if b is None or a is None:
-                changed += 1
-            elif b_dt != a_dt:
-                changed += 1
-            elif b != a:
+            if b is None or a is None or b_dt != a_dt or b != a:
                 changed += 1
 
         pct = (changed / total_cells) if total_cells > 0 else 0.0

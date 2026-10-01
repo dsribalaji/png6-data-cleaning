@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from planner.core.config import settings
 from planner.core.db import SessionLocal
-from planner.llm.gateway import LlmGateway, ResolvedModelConfig, resolve_env_config
 from planner.llm.cache import LlmCache
+from planner.llm.gateway import LlmGateway, ResolvedModelConfig, resolve_env_config
 from planner.modules.model_config.crypto import decrypt_credential
 from planner.modules.model_config.models import ModelConfig
 
@@ -67,7 +67,7 @@ def build_llm_gateway() -> LlmGateway:
         redis_client = aioredis.from_url(
             settings.redis_url, socket_connect_timeout=1, socket_timeout=2
         )
-    except Exception:  # no redis package: the cache falls back to memory
+    except ImportError:  # no redis package: the cache falls back to memory
         redis_client = None
     return LlmGateway(config_resolver=resolve_active_llm_config, cache=LlmCache(redis_client))
 
@@ -84,16 +84,16 @@ def describe_llm_outcome(exc: BaseException | None) -> tuple[str, str | None]:
     return "failed", f"AI suggestions unavailable ({message}); deterministic rules were used."
 
 
-from planner.modules.model_config.features.get_model_config.router import (  # noqa: E402
+from planner.modules.model_config.features.get_model_config.router import (
     router as get_model_config_router,
 )
-from planner.modules.model_config.features.list_providers.router import (  # noqa: E402
+from planner.modules.model_config.features.list_providers.router import (
     router as list_providers_router,
 )
-from planner.modules.model_config.features.test_model_connection.router import (  # noqa: E402
+from planner.modules.model_config.features.test_model_connection.router import (
     router as test_model_connection_router,
 )
-from planner.modules.model_config.features.update_model_config.router import (  # noqa: E402
+from planner.modules.model_config.features.update_model_config.router import (
     router as update_model_config_router,
 )
 

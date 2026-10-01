@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -37,7 +37,7 @@ async def session() -> AsyncGenerator[AsyncSession, None]:
 async def test_accept_invite__valid_token__creates_user_and_auto_logs_in(
     session: AsyncSession,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     raw_token = "raw_invite_token_12345"
     invite = Invite(
         email="newuser@example.com",
@@ -92,7 +92,7 @@ async def test_accept_invite__valid_token__creates_user_and_auto_logs_in(
 async def test_accept_invite__existing_invited_user__activates_user_and_sets_password(
     session: AsyncSession,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(
         email="precreated@example.com",
         status="invited",
@@ -129,7 +129,7 @@ async def test_accept_invite__existing_invited_user__activates_user_and_sets_pas
 async def test_accept_invite__already_accepted_token__raises_invalid_credentials(
     session: AsyncSession,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     raw_token = "used_token_xyz"
     invite = Invite(
         email="used@example.com",
@@ -152,7 +152,7 @@ async def test_accept_invite__already_accepted_token__raises_invalid_credentials
 async def test_accept_invite__expired_token__raises_invalid_credentials(
     session: AsyncSession,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     raw_token = "expired_token_xyz"
     invite = Invite(
         email="expired@example.com",

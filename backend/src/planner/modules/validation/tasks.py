@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from typing import Any
+import logging
 import uuid
+from typing import Any
 from uuid import UUID
 
-import polars as pl
 from sqlalchemy import func, select
 
 from planner.core.audit import record_audit
@@ -17,11 +16,13 @@ from planner.core.events import EventType, ValidationCompletedPayload
 from planner.core.outbox import add_event
 from planner.engine.profile.profiler import ColumnProfile, TableProfile
 from planner.engine.tests_gen.checks import run_checks
-from planner.engine.tests_gen.reconcile import reconcile
 from planner.engine.tests_gen.generator import TestCase, generate_checks
+from planner.engine.tests_gen.reconcile import reconcile
 from planner.modules.execution.public import list_side_tables, read_snapshot_frame
 from planner.modules.validation.models import ReconciliationRow, TestCaseRow, TestRunRow
 from planner.worker import celery_app, send_task_eager_aware
+
+logger = logging.getLogger(__name__)
 
 
 def _build_table_profile(col_rows: list[Any], row_count: int = 0) -> TableProfile:
@@ -106,7 +107,8 @@ async def _async_generate_tests(plan_id: str, job_id: str) -> dict[str, Any]:
                 col_rows = await get_column_profile_rows(session, plan.dataset_id)
                 run = await get_profile_run(session, plan.dataset_id)
                 row_count = int(getattr(run, "row_count", 0) or 0)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 -- profiling data is optional for validation
+            logger.debug("Profiling data unavailable for validation: %s", exc)
             col_rows = []
 
         profile = _build_table_profile(col_rows, row_count)
@@ -263,14 +265,7 @@ async def _async_run_validation(
                      "reconciliationsOk": sum(r.ok for r in recs), "reconciliations": len(recs)},
         )
 
-        try:
-            from planner.core.realtime import publish_job_status
-            from planner.core.events import JobStatusPayload
-            # publish realtime status if available
-        except NotImplementedError:
-            pass
-        except Exception:
-            pass
+        # publish realtime status if available (not wired yet)
 
         return {"passed": passed, "tests": len(cases), "reconciliations": len(recs)}
 
