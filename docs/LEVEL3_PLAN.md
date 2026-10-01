@@ -232,6 +232,20 @@ Each item states what "done" looks like. Size: S ≤ ½ day · M ≈ 1–2 days 
   step all exist in code, but there is no golden test on the reference file), B9
   (`infer_rules.v2` / `propose_steps.v2` prompts do not exist).
 
+## 4f. Demo deployment and status at the deadline (2026-10-01)
+
+- **Public HTTPS demo:** `make demo` (see [DEPLOYMENT.md](DEPLOYMENT.md)) runs the Compose stack and exposes it through a Cloudflare quick tunnel. The web app now ships as a production build (`vite preview`, same `/api` proxy). The full browser walk-through passed over the public URL, and the real Groq model ran inside the stack.
+- **B9 committed:** `v2` prompts (selected by `LLM_PROMPT_VERSION`). The cache key now includes the prompt revision. `fill_missing` and `derive_column` steps always wait for a human.
+- **Exit gate today:**
+
+| Gate line | Status |
+|---|---|
+| Users sign in with SSO and MFA | **Not met.** Keycloak not started; JWT + Argon2 sign-in |
+| Roles enforced on every API | **Met.** Route-coverage test + 401/403 checks in CI |
+| Evaluation benchmark passes; bad input quarantined, never crashes | **Met in CI** (M3 labelled benchmark, scorer and pass bar) |
+| Every release through the pipeline, no manual deploys | **Partly met.** CI builds, scans and publishes the image; the demo is started by hand on the presenter's machine |
+| HTTPS / TLS | **Met for the demo** via the Cloudflare tunnel; encryption at rest not done |
+
 ## 5. Order
 
 Each milestone ends with a tested, working state. The pipeline goes first so that everything after it ships through CI.

@@ -102,4 +102,5 @@ Note for older CPUs without AVX2: the backend depends on `polars[rtcompat]`, whi
 - [decision.md](decision.md) — decision log, newest first.
 - [docs/LOCAL_SHOWCASE.md](docs/LOCAL_SHOWCASE.md) — demo walkthrough.
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md) — Level 2 demo run and timing benchmarks (22 to 30,090 rows).
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — public HTTPS demo in one command (`make demo`) and what is still open for production.
 - [docs/architecture/brief-handoff.md](docs/architecture/brief-handoff.md) — what to build, in what order, what good looks like, what not to build.
