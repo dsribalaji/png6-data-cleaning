@@ -87,6 +87,27 @@ def default_decision(estimated_loss: float, threshold: float, confidence: float)
     return "accepted" if estimated_loss <= threshold and confidence >= LOW_CONFIDENCE else "pending"
 
 
+# Operations that invent a value the source data did not have. decision.md's P1
+# (and B7 for cross-field fill) keeps these out of the automatic path: the FRS
+# leaves fill-vs-null open at OQ-12, and the PowerBI guide's Step 4 shows what
+# goes wrong when a value is assumed (a hardcoded date and invoice number), so a
+# human decides every one of them.
+NEVER_AUTO_ACCEPT: frozenset[str] = frozenset({"fill_missing", "derive_column"})
+
+
+def step_decision(
+    operation: str, estimated_loss: float, threshold: float, confidence: float
+) -> str:
+    """The decision for one proposed step, honouring the never-auto-accept rule.
+
+    Kept separate from `default_decision` so the rule has one home and can be
+    tested directly rather than only through a full plan run.
+    """
+    if operation in NEVER_AUTO_ACCEPT:
+        return "pending"
+    return default_decision(estimated_loss, threshold, confidence)
+
+
 # Only catalogue operations (FR-022); the schema sent to the model lists them.
 Operation = Literal[
     "replace_value",
@@ -544,7 +565,9 @@ async def _generate_plan_impl(
                 rationale=cand.rationale,
                 confidence=cand.confidence,
                 source=cand.source,
-                decision=default_decision(loss.estimated_loss, threshold, cand.confidence),
+                decision=step_decision(
+                    cand.operation, loss.estimated_loss, threshold, cand.confidence
+                ),
             )
             session.add(step_row)
             await session.flush()

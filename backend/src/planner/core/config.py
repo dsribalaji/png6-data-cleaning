@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     environment: str = "local"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
+    # B9: which prompt revision the model tasks use. The file is
+    # `llm/prompts/<task>.<version>.md`, so a new revision is a new file plus
+    # this setting; evaluation scores are recorded per version, which is what
+    # makes "v2 is better than v1" a measured claim rather than a guess.
+    llm_prompt_version: str = "v1"
 
     @field_validator("jwt_secret", mode="after")
     @classmethod

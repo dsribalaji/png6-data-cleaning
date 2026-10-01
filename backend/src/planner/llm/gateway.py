@@ -78,13 +78,50 @@ def _litellm_model_id(provider: str, model: str) -> str:
     return f"{provider}/{model}"
 
 
+def available_prompt_versions(task: str) -> list[str]:
+    """Every prompt revision on disk for a task, e.g. ["v1", "v2"] (B9)."""
+    prompts_dir = pathlib.Path(__file__).parent / "prompts"
+    prefix = f"{task}."
+    versions = []
+    for path in sorted(prompts_dir.glob(f"{task}.*.md")):
+        stem = path.name[: -len(".md")]
+        if stem.startswith(prefix):
+            versions.append(stem[len(prefix):])
+    return versions
+
+
+def resolve_prompt_version(task: str, requested: str | None = None) -> str:
+    """The revision to use: the requested one, else the configured default.
+
+    Falls back to the newest available revision if the requested one has no file,
+    so a typo in `LLM_PROMPT_VERSION` cannot take the AI path down.
+    """
+    versions = available_prompt_versions(task)
+    if not versions:
+        raise FileNotFoundError(f"no prompt file for task '{task}'")
+    wanted = requested or settings.llm_prompt_version
+    if wanted in versions:
+        return wanted
+    newest = sorted(versions, key=lambda v: int(re.sub(r"\D", "", v) or 0))[-1]
+    logger.warning(
+        "llm_prompt_version_missing", task=task, requested=wanted, using=newest
+    )
+    return newest
+
+
 def _load_prompt(
     task: str,
     payload_json: str = "",
     output_schema: str = "",
+    version: str | None = None,
 ) -> str:
-    """Load prompt template for task and substitute placeholders."""
-    prompt_path = pathlib.Path(__file__).parent / "prompts" / f"{task}.v1.md"
+    """Load prompt template for task and substitute placeholders.
+
+    `version` selects `prompts/<task>.<version>.md`; omitted, the configured
+    revision is used (B9).
+    """
+    resolved = resolve_prompt_version(task, version)
+    prompt_path = pathlib.Path(__file__).parent / "prompts" / f"{task}.{resolved}.md"
     content = prompt_path.read_text(encoding="utf-8")
     if output_schema:
         content = content.replace("{{OUTPUT_SCHEMA}}", output_schema)
@@ -278,7 +315,11 @@ class LlmGateway(LlmGatewayPort):
         prompt = _load_prompt(task, payload_json="", output_schema=output_schema)
 
         # 5. Check cache
-        key = self._cache.make_key(config.provider, model_id, PROMPT_VERSION, payload_json)
+        # The prompt revision is part of the key: switching LLM_PROMPT_VERSION must not
+        # return answers cached for another revision.
+        key = self._cache.make_key(
+            config.provider, model_id, resolve_prompt_version(task), payload_json
+        )
         cached = await self._cache.get(key)
         if cached is not None:
             try:

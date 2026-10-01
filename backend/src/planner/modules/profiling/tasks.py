@@ -319,6 +319,7 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
     # Merge and deduplicate by (rule_type, tuple(columns))
     seen_keys: set[tuple[str, tuple[str, ...]]] = set()
     merged: list[tuple[InferredRule, str | None]] = []
+    from planner.llm.gateway import resolve_prompt_version
 
     for r in deterministic_rules:
         k = (r.rule_type, tuple(r.columns))
@@ -330,7 +331,7 @@ async def _infer_rules_impl(dataset_id_str: str, job_id_str: str) -> dict[str, A
         k = (r.rule_type, tuple(r.columns))
         if k not in seen_keys:
             seen_keys.add(k)
-            merged.append((r, "infer_rules.v1"))
+            merged.append((r, f"infer_rules.{resolve_prompt_version('infer_rules')}"))
 
     async with SessionLocal() as session:
         for rule, p_version in merged:

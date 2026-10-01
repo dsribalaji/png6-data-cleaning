@@ -544,6 +544,40 @@ def _blank_and_padding_rows() -> BenchmarkCase:
     )
 
 
+def _cross_field_fill() -> BenchmarkCase:
+    """Two missing dates that a sibling column makes recoverable (B7, FR-019).
+
+    The rule needs >= 2 nulls and a companion column that is constant across
+    exactly those null rows. `batch` is constant for the two missing dates, so
+    the rule may propose filling from it -- but the step must still wait for a
+    human decision (OQ-12: labelled nulls by default).
+    """
+    header = ["invoice_number", "invoice_date", "batch"]
+    rows = [
+        ["INV-001", "2025-04-01", "APR-A"],
+        ["INV-002", "2025-04-01", "APR-A"],
+        ["INV-003", "", "APR-A"],
+        ["INV-004", "2025-05-01", "MAY-A"],
+        ["INV-005", "", "APR-A"],
+    ]
+    return BenchmarkCase(
+        case_id="cross_field_fill",
+        description="Missing dates recoverable from a companion batch column.",
+        tags=("fill", "types"),
+        filename="data.csv",
+        payload=csv_bytes(header, rows),
+        expected={
+            "row_count": 5,
+            "column_count": 3,
+            "quarantined_rows": [],
+            "flagged_cells": [],
+            "rules": ["cross_field_fill"],
+            "sparse_columns": [],
+            "reject": False,
+        },
+    )
+
+
 def _all_null_column() -> BenchmarkCase:
     """A 100% null column: the all_null rule, and the reason the plan may drop it."""
     header = ["invoice_number", "supplier_name", "customer_vat_number"]
@@ -589,6 +623,7 @@ CASE_BUILDERS = (
     _huge_cells,
     _nested_json,
     _blank_and_padding_rows,
+    _cross_field_fill,
     _all_null_column,
 )
 
