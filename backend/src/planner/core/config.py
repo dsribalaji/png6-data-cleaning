@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     n8n_folder_path: str = "./n8n_folder"
     cors_origins: list[str] | str = ["http://localhost:5173"]
     groq_api_key: str | None = None
+    # D-2: "local" = email + password with this app's own JWTs (default, used by the
+    # demo and CI). "oidc" = sign-in only through Keycloak (SSO + MFA); the API then
+    # accepts only RS256 tokens issued by OIDC_ISSUER and signed by a key from its JWKS.
+    auth_mode: Literal["local", "oidc"] = "local"
+    oidc_issuer: str = ""  # e.g. http://localhost:8080/realms/png6 (the token's "iss")
+    oidc_jwks_url: str = ""  # default: <oidc_issuer>/protocol/openid-connect/certs
     # D-7: requests per client IP per minute; 0 switches a limit off.
     rate_limit_login_per_minute: int = 20
     rate_limit_upload_per_minute: int = 10

@@ -65,7 +65,50 @@ class TokenVerifier:
             raise AppError("INVALID_CREDENTIALS") from exc
 
 
-token_verifier = TokenVerifier(settings.jwt_secret, settings.jwt_algorithm)
+# Highest privilege first: a user holding several realm roles gets the strongest one
+# (one role per user is the app's model, OQ-21).
+APP_ROLES = ("administrator", "data_engineer", "auditor", "viewer")
+
+
+class KeycloakTokenVerifier:
+    """AUTH_MODE=oidc (Level 3 D-2): accept RS256 access tokens issued by the Keycloak
+    realm, signed by a key from its JWKS (the realm's published public keys), and map
+    the realm roles onto the app's four roles. MFA is enforced by Keycloak itself (the
+    realm requires a TOTP authenticator), so every token it issues to a person has
+    passed it."""
+
+    def __init__(self, issuer: str, jwks_url: str = "") -> None:
+        self.issuer = issuer.rstrip("/")
+        self._jwks = jwt.PyJWKClient(
+            jwks_url or f"{self.issuer}/protocol/openid-connect/certs", cache_keys=True
+        )
+
+    def verify(self, token: str) -> dict[str, Any]:
+        try:
+            key = self._jwks.get_signing_key_from_jwt(token).key
+            payload: dict[str, Any] = jwt.decode(
+                token,
+                key,
+                algorithms=["RS256"],
+                issuer=self.issuer,
+                # ponytail: every client of the realm is trusted; pin `azp` to the
+                # app's client ids if the realm ever hosts other applications.
+                options={"verify_aud": False, "require": ["exp", "iss", "sub"]},
+            )
+        except Exception as exc:
+            raise AppError("INVALID_CREDENTIALS") from exc
+        roles = set(payload.get("realm_access", {}).get("roles", []))
+        role = next((r for r in APP_ROLES if r in roles), None)
+        if role is None:
+            raise AppError("FORBIDDEN")
+        return {**payload, "role": role}
+
+
+token_verifier: TokenVerifier | KeycloakTokenVerifier = (
+    KeycloakTokenVerifier(settings.oidc_issuer, settings.oidc_jwks_url)
+    if settings.auth_mode == "oidc"
+    else TokenVerifier(settings.jwt_secret, settings.jwt_algorithm)
+)
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
@@ -80,6 +123,7 @@ class RequestPrincipal(BaseModel):
 
     user_id: UUID
     role: str
+    email: str | None = None  # from the OIDC token; used to provision SSO users
 
 
 async def get_current_principal(
@@ -100,7 +144,7 @@ async def get_current_principal(
     except (ValueError, TypeError) as exc:
         raise AppError("INVALID_CREDENTIALS") from exc
 
-    return RequestPrincipal(user_id=user_id, role=str(role))
+    return RequestPrincipal(user_id=user_id, role=str(role), email=payload.get("email"))
 
 
 # Alias for backwards compatibility
@@ -130,3 +174,10 @@ def new_refresh_token() -> tuple[str, str]:
     opaque_token = secrets.token_hex(32)
     token_hash = hash_token(opaque_token)
     return opaque_token, token_hash
+
+
+def require_local_auth() -> None:
+    """Dependency for password sign-in routes: under AUTH_MODE=oidc every sign-in goes
+    through Keycloak, so a password login here would bypass SSO and MFA."""
+    if settings.auth_mode != "local":
+        raise AppError("SSO_REQUIRED")

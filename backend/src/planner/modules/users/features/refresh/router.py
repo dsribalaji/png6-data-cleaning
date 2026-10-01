@@ -8,13 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from planner.core.config import settings
 from planner.core.db import get_session
 from planner.core.errors import AppError
+from planner.core.security import require_local_auth
 from planner.modules.users.features.refresh.schemas import TokenResponse
 from planner.modules.users.features.refresh.service import refresh_tokens
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh", response_model=TokenResponse, dependencies=[Depends(require_local_auth)]
+)
 async def refresh_endpoint(
     response: Response,
     x_requested_with: str | None = Header(None, alias="X-Requested-With"),

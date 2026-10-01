@@ -83,3 +83,21 @@ async def test_get_me__missing_user__raises_account_inactive(session: AsyncSessi
         await get_me(session, principal)
 
     assert exc_info.value.code == "ACCOUNT_INACTIVE"
+
+
+@pytest.mark.asyncio
+async def test_get_me__oidc_first_sign_in__provisions_user(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from uuid import uuid4
+
+    from planner.core.config import settings
+
+    monkeypatch.setattr(settings, "auth_mode", "oidc")
+    principal = RequestPrincipal(user_id=uuid4(), role="auditor", email="kc@example.com")
+
+    result = await get_me(session, principal)
+
+    assert (result.id, result.email, result.role, result.status) == (
+        principal.user_id, "kc@example.com", "auditor", "active"
+    )

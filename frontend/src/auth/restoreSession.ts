@@ -1,5 +1,6 @@
 import type { User } from "../api/schema";
 import { useSessionStore } from "./session.store";
+import { isOidc } from "./oidc";
 
 /**
  * On page load the in-memory access token is gone; trade the httpOnly refresh
@@ -7,6 +8,9 @@ import { useSessionStore } from "./session.store";
  * the route guards then send the user to /login as usual.
  */
 export async function restoreSession(): Promise<void> {
+  // SSO: tokens live in memory only, so a reload goes back through Keycloak, which
+  // signs the user straight in while its own session is still open.
+  if (isOidc) return;
   try {
     const refresh = await fetch("/api/v1/auth/refresh", {
       method: "POST",
