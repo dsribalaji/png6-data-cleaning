@@ -66,7 +66,8 @@ def describe_llm_outcome(exc: BaseException | None) -> tuple[str, str | None]:
     code = getattr(exc, "code", None)
     if code == "LLM_NO_CREDENTIAL":
         return "off", "No AI model is configured; only deterministic rules were used."
-    message = getattr(exc, "message", None) or f"{type(exc).__name__}: {str(exc)[:200]}"
+    first_line = (str(exc).strip().splitlines() or [""])[0][:160]
+    message = getattr(exc, "message", None) or f"{type(exc).__name__}: {first_line}"
     return "failed", f"AI suggestions unavailable ({message}); deterministic rules were used."
 
 

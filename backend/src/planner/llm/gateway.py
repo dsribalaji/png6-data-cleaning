@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import pathlib
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -92,6 +93,43 @@ def _load_prompt(
     return content
 
 
+class InvalidModelOutput(Exception):
+    """The model's reply did not match the output schema (wraps instructor's error)."""
+
+    def __init__(self, detail: str, raw: str | None = None) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.raw_response = raw
+
+    def errors(self) -> list[str]:
+        return [self.detail]
+
+
+class ProviderRateLimited(Exception):
+    """The provider throttled us; retry_after is its suggested wait in seconds."""
+
+    def __init__(self, retry_after: float) -> None:
+        super().__init__(f"provider rate limit, retry after {retry_after:.0f} s")
+        self.retry_after = retry_after
+
+
+def _parse_reply(raw: str | None, out: type[T]) -> T | None:
+    """Last-chance parse of a reply instructor rejected: strip code fences and unwrap
+    a one-item list ([{...}]) that some models return. None if it still does not fit."""
+    if not raw:
+        return None
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`").removeprefix("json").strip()
+    try:
+        data = json.loads(text)
+        if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+            data = data[0]
+        return out.model_validate(data)
+    except (ValueError, ValidationError):
+        return None
+
+
 def _completion(**kwargs: Any) -> Any:
     """litellm.completion, imported on first use: litellm takes 10-20 s to import on
     small machines, so the app only pays for it when a model is actually configured."""
@@ -117,12 +155,39 @@ def _call_model(
         "response_model": out,
         "max_retries": 0,
         "timeout": LLM_TIMEOUT_S,
+        # Repeatable answers for the same profile (cache keys assume this).
+        "temperature": 0,
     }
     if api_key is not None:
         kwargs["api_key"] = api_key
     if endpoint_url is not None:
         kwargs["base_url"] = endpoint_url
-    return client.chat.completions.create(**kwargs)  # type: ignore[no-any-return]
+    try:
+        return client.chat.completions.create(**kwargs)  # type: ignore[no-any-return]
+    except Exception as exc:
+        # instructor raises its own InstructorRetryException for schema mismatches;
+        # surface it as InvalidModelOutput so the gateway's one repair retry runs.
+        if type(exc).__name__ != "InstructorRetryException":
+            raise
+        text = str(exc)
+        if "RateLimitError" in text or "rate_limit" in text:
+            wait = re.search(r"try again in ([0-9.]+)s", text)
+            raise ProviderRateLimited(float(wait.group(1)) if wait else 10.0) from exc
+        last = getattr(exc, "last_completion", None)
+        raw = None
+        if last is not None:
+            try:
+                raw = last.choices[0].message.content
+            except Exception:
+                raw = None
+        parsed = _parse_reply(raw, out)
+        if parsed is not None:
+            return parsed
+        first_line = str(exc).strip().splitlines()
+        detail = next(
+            (ln.strip() for ln in first_line if "validation error" in ln), "schema mismatch"
+        )
+        raise InvalidModelOutput(detail, raw) from exc
 
 
 async def resolve_env_config() -> ResolvedModelConfig | None:
@@ -239,11 +304,15 @@ class LlmGateway(LlmGatewayPort):
         ]
 
         # 7. Model invocation with 1 repair retry on ValidationError
+        call = (_call_model, model_id, messages, out, config.api_key, config.endpoint_url)
         try:
-            result = await asyncio.to_thread(
-                _call_model, model_id, messages, out, config.api_key, config.endpoint_url
-            )
-        except ValidationError as err1:
+            try:
+                result = await asyncio.to_thread(*call)
+            except ProviderRateLimited as limited:
+                # Free tiers throttle per minute; wait once (bounded) and try again.
+                await asyncio.sleep(min(limited.retry_after + 1, 30))
+                result = await asyncio.to_thread(*call)
+        except (ValidationError, InvalidModelOutput) as err1:
             failed_content = (
                 getattr(err1, "raw_response", None)
                 or getattr(err1, "input_value", None)
@@ -263,7 +332,7 @@ class LlmGateway(LlmGatewayPort):
                 result = await asyncio.to_thread(
                     _call_model, model_id, messages, out, config.api_key, config.endpoint_url
                 )
-            except ValidationError as err2:
+            except (ValidationError, InvalidModelOutput) as err2:
                 raise LlmError(
                     "LLM_UNRELIABLE_OUTPUT",
                     "The model returned invalid structured output twice; "

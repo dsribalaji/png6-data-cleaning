@@ -6,7 +6,7 @@ import asyncio
 from dataclasses import dataclass
 import os
 import tempfile
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import polars as pl
@@ -68,8 +68,15 @@ class _InferRulesPayload(BaseModel):
     samples: dict[str, list[str]]
 
 
+# The JSON schema sent to the model lists the allowed values, so the model is told
+# the catalogue instead of inventing names (seen live: "arithmetic_equality").
+RuleType = Literal[
+    "entity_group", "arithmetic", "primary_key", "one_to_many", "semantic_type", "cross_field_fill"
+]
+
+
 class _RuleOut(BaseModel):
-    rule_type: str
+    rule_type: RuleType
     columns: list[str]
     expression: dict[str, Any]
     confidence: float = 0.8

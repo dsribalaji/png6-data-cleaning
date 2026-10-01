@@ -147,3 +147,42 @@ def test_neutralise_formulas__formula_text_made_inert_numbers_untouched() -> Non
         None,
     ]
     assert out["n"].to_list() == df["n"].to_list()
+
+
+# --- Found on the first real Groq run: schema mismatches must reach the repair retry ---
+
+
+@pytest.mark.asyncio
+async def test_gateway__instructor_style_failure__one_repair_retry_then_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import BaseModel
+
+    from planner.llm import gateway as gw
+
+    class Out(BaseModel):
+        rules: list[str]
+
+    calls: list[int] = []
+
+    def fake_call(*args: object, **kwargs: object) -> Out:
+        calls.append(1)
+        if len(calls) == 1:
+            raise gw.InvalidModelOutput("1 validation error for Out", raw="[{...}]")
+        return Out(rules=["ok"])
+
+    async def resolver() -> gw.ResolvedModelConfig:
+        return gw.ResolvedModelConfig(provider="groq", model="m", api_key="k")
+
+    monkeypatch.setattr(gw, "_call_model", fake_call)
+    out = await gw.LlmGateway(config_resolver=resolver).complete("infer_rules", Out(rules=[]), Out)
+    assert out.rules == ["ok"] and len(calls) == 2
+
+
+def test_parse_reply__unwraps_one_item_list_and_code_fences() -> None:
+    from planner.llm.gateway import _parse_reply
+    from planner.modules.profiling.tasks import _RulesOut
+
+    assert _parse_reply('[{"rules": []}]', _RulesOut).rules == []
+    assert _parse_reply('```json\n{"rules": []}\n```', _RulesOut).rules == []
+    assert _parse_reply("not json", _RulesOut) is None

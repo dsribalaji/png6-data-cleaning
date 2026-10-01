@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import logging
 import os
 import tempfile
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import polars as pl
@@ -87,8 +87,21 @@ def default_decision(estimated_loss: float, threshold: float, confidence: float)
     return "accepted" if estimated_loss <= threshold and confidence >= LOW_CONFIDENCE else "pending"
 
 
+# Only catalogue operations (FR-022); the schema sent to the model lists them.
+Operation = Literal[
+    "replace_value",
+    "fill_missing",
+    "drop_column",
+    "cast_type",
+    "derive_column",
+    "expand_nested",
+    "deduplicate",
+    "standardise_format",
+]
+
+
 class _ProposedStep(BaseModel):
-    operation: str
+    operation: Operation
     parameters: dict[str, Any]
     rationale: str
     confidence: float = 0.8
@@ -487,8 +500,9 @@ async def _generate_plan_impl(
 
     ai_status, ai_message = describe_llm_outcome(llm_exc)
     if ai_status == "used" and rejected:
-        ai_message = f"{len(rejected)} AI-suggested step(s) were invalid and left out: " + "; ".join(
-            rejected[:5]
+        ai_message = (
+            f"{len(rejected)} AI-suggested step(s) were invalid and left out: "
+            + "; ".join(rejected[:5])
         )
 
     # Compute loss per step on df
