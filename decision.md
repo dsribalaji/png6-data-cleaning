@@ -2,6 +2,62 @@
 
 Newest first. Each entry: date, decider, decision, rationale, status (active / superseded / proposed).
 
+## 2026-10-01 — Real-model e2e verified: Groq openai/gpt-oss-120b returns 11 schema-valid rules (SB's stored key)
+
+**Decision:** Verify the AI inference path against the real model instead of leaving it
+fake-only. Replicated `LlmGateway.complete("infer_rules", …)` exactly — same prompt
+template (`prompts/infer_rules.v2.md` with the `_RulesOut` JSON schema), same
+`_InferRulesPayload` built by `_try_llm_rules` (injection scan + masking, ≤5 samples,
+`allow_data_sharing=False`), same `<<<PAYLOAD_JSON` fenced user block — but drove the
+model through the groq skill CLI (surrogate auth; the raw key never touched the backend
+env, per the skill's rules).
+
+**Result:** the model returned 11 rules on the real reference-workbook profile and every
+one validated against the exact `_RulesOut` schema the gateway enforces. Sensible output:
+supplier/customer entity groups, `arithmetic(total_price, subtotal_with_vat)`,
+`primary_key(invoice_number)`, one-to-many links, semantic types — and notably no
+`cross_field_fill` invented, consistent with B7's restraint finding. No hallucin­ated rule
+types outside the Literal catalogue.
+
+**Caveat (honest):** this proves model + prompt + schema end-to-end; the one sliver not
+exercised is LiteLLM/instructor's own HTTP plumbing, which the B8 stub test covers at the
+gateway seam. Verification script at `/tmp/e2e_build_messages.py` (ephemeral).
+
+**Status:** active.
+
+## 2026-10-01 — B7 golden test + B8 cache measurement closed (SB assigned, Ruby coordinated)
+
+**Decision:** Close the two remaining code-level Level-3 gaps with tests only — no engine
+changes — via two new files: `backend/tests/unit/test_b7_golden_reference.py` (3 tests) and
+`backend/tests/unit/test_b8_cache_measurement.py` (2 tests). Full backend suite now
+178/178 (was 173/173).
+
+**B7 — the golden test asserts restraint, not a fill.** Running `infer_rules` on the real
+reference workbook fires zero `cross_field_fill` rules, and that is correct: the null
+columns (`purchase_order_number`, `supplier_vat_number`) have no genuine sibling holding an
+answer — the only constant sibling is `customer_name="HAC"` everywhere, and filling a PO/VAT
+number with a customer name would be inventing data, forbidden by OQ-12 and B9's
+never-auto-accept rule. The test therefore pins three things: (1) restraint on real data,
+(2) a positive control — the synthetic corpus case still fires exactly one rule
+(`invoice_date ← batch = "APR-A"`), proving the rule is alive, and (3) `fill_missing` is
+never auto-accepted at any confidence. Forcing a fill on the reference file would have
+meant fabricating ground truth; that was deliberately not done.
+
+**B8 — the cache is now measured, deterministically.** A counting stub behind the real
+`LlmGateway.complete()` seam proves: second identical call makes 0 model calls, and the
+cache key (`llm:{sha256(...)}`) changes with prompt version (v1→v2 is a miss). No network,
+no litellm import, no API key — CI-safe. No engine seam was needed; `_call_model` was
+already monkeypatchable and `complete()` already checks the cache first.
+
+**Rationale:** Both gaps were test-only by evidence, not assumption — the workers tried the
+engine path first and the code was already correct. Two workers, disjoint files, agy for
+edits (headless needed `--dangerously-skip-permissions` per its own guidance), nothing
+committed, reference workbook untouched (SHA-256 unchanged).
+
+**Status:** active. Remaining Level-3 items are branch protection, the lint ratchet, and the
+VM-parked deploy items (E5, D-5, D-6, M6). The real-model end-to-end run listed as pending
+above was completed the same day: see 2026-10-01 entry "Real-model e2e verified" below.
+
 ## 2026-10-01 — Level 3 M3: labelled evaluation benchmark, scorer and CI pass bar (C1, C2, C3)
 
 **Decision:** Replace the three in-code adversarial fixtures with a labelled benchmark
